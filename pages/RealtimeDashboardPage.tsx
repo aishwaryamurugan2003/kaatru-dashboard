@@ -5,6 +5,7 @@ import RealtimeMapAll from "@/components/RealtimeMapAll";
 import Loading from "../components/Loading";
 import SensorHistoryChart from "@/components/SensorHistoryChart";
 import ReactCardFlip from "react-card-flip";
+import DynamicVisualization from "@/components/DynamicVisualization";
 import Select from "react-select";
 interface Option {
   label: string;
@@ -42,6 +43,9 @@ const RealtimeDashboardPage: React.FC = () => {
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [realtimeTimeout, setRealtimeTimeout] = useState(false);
+  const [showVisualization, setShowVisualization] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+
 
   // 🔥 NEW: index-based rotation
   const [activeIndex, setActiveIndex] = useState(0);
@@ -122,9 +126,22 @@ const filteredDevices = useMemo(() => {
     : null;
 
   const aggregate = useMemo(
-    () => calculateAverages(filteredDevices),
-    [filteredDevices]
-  );
+  () => calculateAverages(filteredDevices),
+  [filteredDevices]
+);
+
+
+const chartData = useMemo(() => {
+  return Object.entries(filteredDevices).map(([id, d]: any) => ({
+    device: id,
+    sPM2: Number(d.sPM2) || 0,
+    sPM10: Number(d.sPM10) || 0,
+    temp: Number(d.temp) || 0,
+    rh: Number(d.rh) || 0,
+    vcol: Number(d.vcol) || 0,
+  }));
+}, [filteredDevices]);
+
 
   // fetch groups
   useEffect(() => {
@@ -215,7 +232,7 @@ const filteredDevices = useMemo(() => {
     <div className="p-6 space-y-4 bg-gray-50 dark:bg-gray-900">
 
       {/* TOP FILTER BAR */}
-      <div className="flex items-center gap-4 bg-white dark:bg-gray-800 p-3 rounded-xl shadow">
+      <div className="flex items-center gap-4 bg-white dark:bg-gray-800 p-3 rounded-xl shadow relative">
 <Select
   options={groups.map((g: any) => ({
     label: g.name,
@@ -266,7 +283,32 @@ const filteredDevices = useMemo(() => {
     }),
   }}
 />
-      </div>
+<div className="relative">
+  <button
+    className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+    onClick={() => setShowAddMenu(!showAddMenu)}
+  >
+    Add
+  </button>
+
+  {showAddMenu && (
+    <div className="absolute right-0 mt-2 bg-white shadow rounded-lg p-2 w-40 z-50">
+      <button
+        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded"
+        onClick={() => {
+          setShowVisualization(true);
+          setShowAddMenu(false);
+        }}
+      >
+        Visualization
+      </button>
+    </div>
+  )}
+</div>
+</div>
+
+
+
 
       {/* MAIN GRID */}
       <div className="grid grid-cols-[3fr_2fr] gap-4">
@@ -372,6 +414,9 @@ const filteredDevices = useMemo(() => {
 </div>
 
 
+{showVisualization && (
+  <DynamicVisualization data={chartData} />
+)}
 
 
       </div>

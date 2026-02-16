@@ -8,6 +8,7 @@ import LoginPage from "./pages/LoginPage";
 import DeviceAdministrationPage from "./pages/DeviceAdministrationPage";
 import DataVisualizationPage from "./pages/DataVisualizationPage";
 import RealtimeDashboardPage from "./pages/RealtimeDashboardPage";
+import ChartCustomizationPage from "./pages/ChartCustomizationPage"; // ✅ NEW
 
 import { isTokenAlive } from "./utils/token";
 import { apiService } from "./services/api";
@@ -92,6 +93,18 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <RealtimeDashboardPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ---------- NEW CHART CUSTOMIZATION PAGE ---------- */}
+        <Route
+          path="/chart-customization"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <ChartCustomizationPage />
               </DashboardLayout>
             </ProtectedRoute>
           }

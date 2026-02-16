@@ -221,6 +221,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     </svg>
   }
 />
+<NavItem
+  to="/chart-customization"
+  isExpanded={isOpen}
+  label="Chart Customization"
+  icon={
+    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 19V5m6 14V9m6 10V3"
+      />
+    </svg>
+  }
+/>
 
 
         </ul>
