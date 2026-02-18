@@ -1,30 +1,19 @@
 import { Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { apiService } from "../services/api";
 import React from "react";
+import { isTokenAlive } from "../utils/token";
 
 export default function ProtectedRoute({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [allowed, setAllowed] = useState<boolean | null>(null);
+  const token = localStorage.getItem("token");
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      const loggedIn = await apiService.isLoggedIn();
-      setAllowed(loggedIn);
-    };
-    checkAuth();
-  }, []);
-
-  if (allowed === null) {
-    return <div className="p-6">Checking authentication...</div>;
-  }
-
-  if (!allowed) {
+  // If no token or expired token → redirect to login
+  if (!token || !isTokenAlive(token)) {
     return <Navigate to="/" replace />;
   }
 
+  // Otherwise allow access
   return <>{children}</>;
 }

@@ -5,13 +5,19 @@ import { useEffect } from "react";
 /* ---------------------------------------------
    MARKER ICONS
 --------------------------------------------- */
-const normalIcon = new L.Icon({
-  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
-});
+// const normalIcon = new L.Icon({
+//   iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+//   shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
+// });
 
-const activeIcon = new L.Icon({
-  iconUrl: "https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png",
+// const activeIcon = new L.Icon({
+//   iconUrl: "https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png",
+// });
+const deviceIcon = new L.Icon({
+  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+  // shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png", 
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
 });
 
 /* ---------------------------------------------
@@ -96,7 +102,7 @@ return (
         <Marker
           key={d.id}
           position={[d.lat, d.lon]}
-          icon={d.id === activeId ? activeIcon : normalIcon}
+          icon={deviceIcon}
           eventHandlers={{
             click: () => onMarkerClick?.(d.id),
           }}
