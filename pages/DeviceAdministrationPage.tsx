@@ -47,31 +47,50 @@ const fetchUsers = async () => {
   useEffect(() => {
     fetchUsers();
   }, []);
+const columns = [
+  { title: "S.No", dataIndex: "sno", width: 80 },
 
-  const columns = [
-    { title: "S.No", dataIndex: "sno", width: 80 },
-    { title: "Username", dataIndex: "username" },
-    {
-      title: "Groups",
-      dataIndex: "groups",
-      key: "groups",
-      render: (_, record) => <GroupChips access={record.access} />,
-    },
-    { title: "Email Address", dataIndex: "email" },
-    {
-      title: "Actions",
-      width: 120,
-      render: (_, record) => (
-        <div className="flex gap-4 text-lg cursor-pointer">
-          <EditOutlined
-            className="text-blue-600 hover:text-blue-800"
-            onClick={() => setEditUser(record)}
-          />
-          <DeleteOutlined className="text-red-600 hover:text-red-800" />
-        </div>
-      ),
-    },
-  ];
+  {
+    title: "Username",
+    dataIndex: "username",
+    render: (text: string) => (
+      <span className="text-lg font-medium">{text}</span>
+    ),
+  },
+
+  {
+    title: "Groups",
+    dataIndex: "groups",
+    key: "groups",
+    render: (_, record) => (
+      <div className="text-lg">
+        <GroupChips access={record.access} />
+      </div>
+    ),
+  },
+
+  {
+    title: "Email Address",
+    dataIndex: "email",
+    render: (text: string) => (
+      <span className="text-lg">{text}</span>
+    ),
+  },
+
+  {
+    title: "Actions",
+    width: 120,
+    render: (_, record) => (
+      <div className="flex gap-4 text-xl cursor-pointer">
+        <EditOutlined
+          className="text-blue-600 hover:text-blue-800"
+          onClick={() => setEditUser(record)}
+        />
+        <DeleteOutlined className="text-red-600 hover:text-red-800" />
+      </div>
+    ),
+  },
+];
 
 
   const GroupChips = ({ access }) => {
@@ -85,7 +104,7 @@ const fetchUsers = async () => {
         {firstThree.map((g) => (
           <span
             key={g.group_id}
-            className="px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-700"
+            className="px-3 py-1 rounded-md text-sm font-medium bg-purple-100 text-purple-700"
           >
             {g.group_name}
           </span>
@@ -118,7 +137,7 @@ const fetchUsers = async () => {
   ------------------------------------------------------------ */
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Device Management</h1>
+      <h1 className="text-3xl font-bold mb-6">Device Management</h1>
 
       <div className="flex justify-between mb-6">
         <input
@@ -138,15 +157,17 @@ const fetchUsers = async () => {
 
       <div className="bg-white shadow rounded-lg p-4">
         <Table
-          columns={columns}
-          dataSource={users.filter((u) =>
-            [u.username, u.email, u.groups]
-              .join(" ")
-              .toLowerCase()
-              .includes(searchText.toLowerCase())
-          )}
-          pagination={{ pageSize: 10 }}
-        />
+  columns={columns}
+  dataSource={users.filter((u) =>
+    [u.username, u.email, u.groups]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchText.toLowerCase())
+  )}
+  pagination={{ pageSize: 10 }}
+  className="text-base"
+/>
+
       </div>
 
       {/* ADD */}

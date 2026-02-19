@@ -56,17 +56,32 @@ const RealtimeDashboardPage: React.FC = () => {
 
   const devices = useRealtimeDevices(selectedGroup, selectedDevices);
 
+// const filteredDevices = useMemo(() => {
+//   const result: Record<string, any> = {};
+
+//   for (const id of selectedDevices) {
+//     if (devices[id]) {
+//       result[id] = devices[id];
+//     }
+//   }
+
+//   return result;
+// }, [devices, selectedDevices.join(",")]);
+
 const filteredDevices = useMemo(() => {
+  if (!selectedDevices.length) return devices;
+
   const result: Record<string, any> = {};
 
-  for (const id of selectedDevices) {
-    if (devices[id]) {
-      result[id] = devices[id];
+  Object.entries(devices).forEach(([id, data]) => {
+    if (selectedDevices.includes(id)) {
+      result[id] = data;
     }
-  }
+  });
 
   return result;
-}, [devices, selectedDevices.join(",")]);
+}, [devices, selectedDevices]);
+
 
 
   const isRealtimeLoading =

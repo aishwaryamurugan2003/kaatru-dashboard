@@ -3,7 +3,7 @@ import { apiService, Endpoint } from "../services/api";
 
 export function useRealtimeDevices(groupId: string, selectedDevices: string[]) {
   const [devices, setDevices] = useState<Record<string, any>>({});
-  const mqttTopicRef = useRef<string>("");
+  const [mqttTopic, setMqttTopic] = useState<string>("");
 
   /* ------------------------------------------------------------
      RESET DEVICES WHEN GROUP OR SELECTION CHANGES
@@ -22,8 +22,9 @@ export function useRealtimeDevices(groupId: string, selectedDevices: string[]) {
     apiService
       .get(Endpoint.GROUP_DEVICES, { id: groupId })
       .then((res: any) => {
-        mqttTopicRef.current = res.data.group?.[0]?.mqtt_topic || "";
-        console.log("MQTT TOPIC:", mqttTopicRef.current);
+        const topic = res.data.group?.[0]?.mqtt_topic || "";
+        setMqttTopic(topic);
+        console.log("MQTT TOPIC:", topic);
       })
       .catch((err) => {
         console.error("Failed to load MQTT topic", err);
@@ -31,28 +32,36 @@ export function useRealtimeDevices(groupId: string, selectedDevices: string[]) {
   }, [groupId]);
 
   /* ------------------------------------------------------------
-     CONNECT WEBSOCKETS FOR SELECTED DEVICES
+     CONNECT WEBSOCKETS WHEN TOPIC + DEVICES READY
   ------------------------------------------------------------ */
-  useEffect(() => {
-    if (!mqttTopicRef.current || selectedDevices.length === 0) return;
+useEffect(() => {
+  if (!mqttTopic || selectedDevices.length === 0) return;
 
-    selectedDevices.forEach((deviceId) => {
-      apiService.connectDeviceWebSocket(
-        deviceId,
-        mqttTopicRef.current,
-        (data) => {
-          setDevices((prev) => ({
-            ...prev,
-            [deviceId]: data,
-          }));
-        }
-      );
-    });
+  apiService.disconnectAllWebSockets();
 
-    return () => {
-      apiService.disconnectAllWebSockets();
-    };
-  }, [selectedDevices, groupId]);
+  selectedDevices.forEach((deviceId) => {
+    // Replace wildcard with actual device id
+    const deviceTopic = mqttTopic.replace("+", deviceId);
+
+    console.log("Connecting:", deviceTopic);
+
+    apiService.connectDeviceWebSocket(
+      deviceId,
+      deviceTopic,
+      (data) => {
+        setDevices((prev) => ({
+          ...prev,
+          [deviceId]: data,
+        }));
+      }
+    );
+  });
+
+  return () => {
+    apiService.disconnectAllWebSockets();
+  };
+}, [mqttTopic, selectedDevices]);
+
 
   return devices;
 }

@@ -12,25 +12,53 @@ import {
 } from "recharts";
 import { mockApiResponse, convertToChartData } from "../services/mockDevices";
 
+function formatTime(value: any) {
+  if (!value) return "";
+  const date = new Date(value);
+  return date.toLocaleTimeString();
+}
 
 type ChartConfig = {
   id: string;
   type: string;
   xKey: string;
   yKey: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 };
 
+const STORAGE_KEY = "customCharts";
+
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
-const mockDevices = convertToChartData(mockApiResponse);
-const fields = ["device", "srvtime", "sPM2", "sPM1", "sPM10", "temp", "rh"];
+
+const mockDevices = convertToChartData(mockApiResponse).sort(
+  (a, b) => (a.srvtime ?? 0) - (b.srvtime ?? 0)
+);
+
+const fields = [
+  "device",
+  "srvtime",
+  "sPM2",
+  "sPM1",
+  "sPM10",
+  "temp",
+  "rh",
+  "co_ppb",
+  "so2_ppb",
+  "o3_ppb_compensated",
+  "no2_ppb",
+  "rs485_data",
+  "sVocI",
+  "k30Co2",
+];
 
 /* ---------------- CHART RENDERER ---------------- */
 function RenderChart({ config }: { config: ChartConfig }) {
   const { type, xKey, yKey } = config;
 
-  const isCategory = xKey === "device";
   const isTime = xKey === "srvtime";
-
 
   return (
     <div className="bg-white rounded-xl shadow p-4 h-[320px]">
@@ -40,19 +68,17 @@ function RenderChart({ config }: { config: ChartConfig }) {
             <LineChart data={mockDevices}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
-  dataKey={xKey}
-  type={isCategory ? "category" : "number"}
-  tickFormatter={(value) =>
-    isTime
-      ? new Date(value).toLocaleTimeString()
-      : value
-  }
-/>
-
+                dataKey={xKey}
+                type={isTime ? "number" : "category"}
+                domain={isTime ? ["auto", "auto"] : undefined}
+                tickFormatter={(value) =>
+                  isTime ? formatTime(value) : value
+                }
+              />
               <YAxis />
               <Tooltip />
               <Legend />
-              <Line dataKey={yKey} stroke="#3b82f6" />
+              <Line dataKey={yKey} stroke="#3b82f6" dot />
             </LineChart>
           )}
 
@@ -60,15 +86,13 @@ function RenderChart({ config }: { config: ChartConfig }) {
             <BarChart data={mockDevices}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
-  dataKey={xKey}
-  type={isCategory ? "category" : "number"}
-  tickFormatter={(value) =>
-    isTime
-      ? new Date(value).toLocaleTimeString()
-      : value
-  }
-/>
-
+                dataKey={xKey}
+                type={isTime ? "number" : "category"}
+                domain={isTime ? ["auto", "auto"] : undefined}
+                tickFormatter={(value) =>
+                  isTime ? formatTime(value) : value
+                }
+              />
               <YAxis />
               <Tooltip />
               <Legend />
@@ -76,73 +100,83 @@ function RenderChart({ config }: { config: ChartConfig }) {
             </BarChart>
           )}
 
-          {type === "pie" && (
-            <PieChart>
-              <Tooltip />
-              <Legend />
-              <Pie
-                data={mockDevices}
-                dataKey={yKey}
-                nameKey={xKey}
-                outerRadius={100}
-              >
-                {mockDevices.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
-              </Pie>
-            </PieChart>
-          )}
+          {type === "pie" && (() => {
+            const pieData = Object.values(
+              mockDevices.reduce((acc: any, item: any) => {
+                acc[item.device] = acc[item.device] || {
+                  device: item.device,
+                  value: 0,
+                };
+                acc[item.device].value += item[yKey] || 0;
+                return acc;
+              }, {})
+            );
+
+            return (
+              <PieChart>
+                <Tooltip />
+                <Legend verticalAlign="bottom" />
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  nameKey="device"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                >
+                  {pieData.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  ))}
+                </Pie>
+              </PieChart>
+            );
+          })()}
 
           {type === "scatter" && (
-  <ScatterChart>
-    <CartesianGrid />
-    <XAxis
-      type="number"
-      dataKey={xKey}
-      tickFormatter={(value) =>
-        isTime
-          ? new Date(value).toLocaleTimeString()
-          : value
-      }
-    />
-    <YAxis type="number" dataKey={yKey} />
-    <Tooltip
-      labelFormatter={(value) =>
-        isTime
-          ? new Date(value).toLocaleString()
-          : value
-      }
-    />
-    <Scatter data={mockDevices} fill="#f59e0b" />
-  </ScatterChart>
-)}
-
+            <ScatterChart>
+              <CartesianGrid />
+              <XAxis
+                dataKey={xKey}
+                type={isTime ? "number" : "category"}
+                domain={isTime ? ["auto", "auto"] : undefined}
+                tickFormatter={(value) =>
+                  isTime ? formatTime(value) : value
+                }
+              />
+              <YAxis type="number" dataKey={yKey} />
+              <Tooltip />
+              <Scatter data={mockDevices} fill="#f59e0b" />
+            </ScatterChart>
+          )}
 
           {type === "composed" && (
             <ComposedChart data={mockDevices}>
               <CartesianGrid strokeDasharray="3 3" />
-             <XAxis
-  dataKey={xKey}
-  type={isCategory ? "category" : "number"}
-  tickFormatter={(value) =>
-    isTime
-      ? new Date(value).toLocaleTimeString()
-      : value
-  }
-/>
-
+              <XAxis
+                dataKey={xKey}
+                type={isTime ? "number" : "category"}
+                domain={isTime ? ["auto", "auto"] : undefined}
+                tickFormatter={(value) =>
+                  isTime ? formatTime(value) : value
+                }
+              />
               <YAxis />
               <Tooltip />
               <Legend />
               <Bar dataKey={yKey} fill="#10b981" />
-              <Line dataKey={yKey} stroke="#ef4444" />
+              <Line dataKey={yKey} stroke="#3b82f6" dot />
             </ComposedChart>
           )}
 
           {type === "radar" && (
             <RadarChart data={mockDevices}>
               <PolarGrid />
-              <PolarAngleAxis dataKey={xKey} />
+              <PolarAngleAxis
+                dataKey={xKey}
+                tickFormatter={(value) =>
+                  isTime ? formatTime(value) : value
+                }
+              />
               <PolarRadiusAxis />
               <Radar dataKey={yKey} fill="#3b82f6" fillOpacity={0.5} />
               <Legend />
@@ -156,31 +190,54 @@ function RenderChart({ config }: { config: ChartConfig }) {
 
 /* ---------------- MAIN PAGE ---------------- */
 export default function ChartCustomizationPage() {
-  const [charts, setCharts] = useState<ChartConfig[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [type, setType] = useState("line");
-  const [xKey, setXKey] = useState("device");
-  const [yKey, setYKey] = useState("sPM2");
+  const [xKey, setXKey] = useState("");
+  const [yKey, setYKey] = useState("");
 
-  /* Load from localStorage */
+  /* Load charts from localStorage */
   useEffect(() => {
-    const saved = localStorage.getItem("customCharts");
-    if (saved) setCharts(JSON.parse(saved));
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) setCharts(JSON.parse(saved));
+    } catch (err) {
+      console.error("Failed to load charts", err);
+    }
   }, []);
 
-  /* Save to localStorage */
-  useEffect(() => {
-    localStorage.setItem("customCharts", JSON.stringify(charts));
-  }, [charts]);
+  /* Save charts to localStorage */
+  const STORAGE_KEY = "customCharts";
+
+/* Load charts from localStorage on first render */
+const [charts, setCharts] = useState<ChartConfig[]>(() => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+});
+
+/* Save charts whenever they change */
+useEffect(() => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(charts));
+  } catch (err) {
+    console.error("Failed to save charts", err);
+  }
+}, [charts]);
 
 function addChart() {
-  // Pie chart must use category
+  if (!xKey || !yKey) {
+    alert("Please select both X-axis and Y-axis");
+    return;
+  }
+
   if (type === "pie" && xKey !== "device") {
     alert("Pie chart requires 'device' as X-axis");
     return;
   }
 
-  // Scatter requires numeric X-axis
   if (type === "scatter" && xKey === "device") {
     alert("Scatter chart requires numeric X-axis");
     return;
@@ -191,30 +248,46 @@ function addChart() {
     type,
     xKey,
     yKey,
+    x: 0,        // column position
+    y: Infinity, // place at bottom automatically
+    w: 6,        // width (columns)
+    h: 6,        // height (rows)
   };
 
   setCharts((prev) => [...prev, newChart]);
   setShowAdd(false);
+  setXKey("");
+  setYKey("");
 }
-
 
 
   function removeChart(id: string) {
     setCharts((prev) => prev.filter((c) => c.id !== id));
   }
 
+  function resetCharts() {
+    localStorage.removeItem(STORAGE_KEY);
+    setCharts([]);
+  }
+
   return (
     <div className="p-6 space-y-6">
+      <div className="flex gap-3">
+        <button
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+          onClick={() => setShowAdd(true)}
+        >
+          + Add Chart
+        </button>
 
-      {/* Add button */}
-      <button
-        className="bg-blue-600 text-white px-4 py-2 rounded-lg"
-        onClick={() => setShowAdd(true)}
-      >
-        + Add Chart
-      </button>
+        <button
+          className="bg-gray-500 text-white px-4 py-2 rounded-lg"
+          onClick={resetCharts}
+        >
+          Reset Charts
+        </button>
+      </div>
 
-      {/* Add chart panel */}
       {showAdd && (
         <div className="bg-white p-4 rounded-xl shadow flex gap-4 items-center">
           <select value={type} onChange={(e) => setType(e.target.value)}>
@@ -226,8 +299,8 @@ function addChart() {
             <option value="radar">Radar</option>
           </select>
 
-          {/* X Axis selector */}
           <select value={xKey} onChange={(e) => setXKey(e.target.value)}>
+            <option value="">X-axis</option>
             {fields.map((f) => (
               <option key={f} value={f}>
                 {f}
@@ -235,8 +308,8 @@ function addChart() {
             ))}
           </select>
 
-          {/* Y Axis selector */}
           <select value={yKey} onChange={(e) => setYKey(e.target.value)}>
+            <option value="">Y-axis</option>
             {fields.map((f) => (
               <option key={f} value={f} disabled={f === xKey}>
                 {f}
@@ -253,7 +326,6 @@ function addChart() {
         </div>
       )}
 
-      {/* Charts grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {charts.map((chart) => (
           <div key={chart.id} className="relative">

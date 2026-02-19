@@ -11,7 +11,7 @@ export type SensorRecord = {
   rs485_data?: number | null;
   sVocI?: number | null;
   k30Co2?: number | null;
-  srvtime: number;
+  srvtime?: number;
 };
 
 export type DevicePacket = {
@@ -28,14 +28,15 @@ export type ApiResponse = {
   data: DevicePacket[];
 };
 
-/* Generate one sensor record */
-function generateSensorRecord(): SensorRecord {
+/* ---------------- MOCK GENERATORS ---------------- */
+
+function generateValidRecord(time: number): SensorRecord {
   return {
     sPM2: Number((20 + Math.random() * 30).toFixed(1)),
     sPM1: Number((15 + Math.random() * 25).toFixed(1)),
     sPM10: Number((25 + Math.random() * 40).toFixed(1)),
-    temp: Number((25 + Math.random() * 6).toFixed(1)),
     rh: Number((45 + Math.random() * 25).toFixed(1)),
+    temp: Number((22 + Math.random() * 10).toFixed(1)),
     co_ppb: null,
     so2_ppb: null,
     o3_ppb_compensated: null,
@@ -43,36 +44,56 @@ function generateSensorRecord(): SensorRecord {
     rs485_data: null,
     sVocI: null,
     k30Co2: null,
-    srvtime: Date.now() - Math.floor(Math.random() * 3600000),
+    srvtime: time,
   };
 }
 
-/* Generate devices exactly like API */
+
+function generateNullRecord(): SensorRecord {
+  return {
+    sPM2: null,
+    sPM1: null,
+    sPM10: null,
+    rh: null,
+    temp: null,
+    co_ppb: null,
+    so2_ppb: null,
+    o3_ppb_compensated: null,
+    no2_ppb: null,
+    rs485_data: null,
+    sVocI: null,
+    k30Co2: null,
+  };
+}
+
 function generateMockDevices(count: number): ApiResponse {
   const devices: DevicePacket[] = [];
 
   for (let i = 1; i <= count; i++) {
+    const baseTime = Date.now() - 30 * 60 * 1000;
     const records: SensorRecord[] = [];
 
-    const baseTime = Date.now() - 8 * 60000; // 8 minutes ago
+    for (let j = 0; j < 8; j++) {
+      if (j % 3 === 0) {
+        records.push(generateValidRecord(baseTime + j * 60000));
+      } else {
+        records.push(generateNullRecord());
+      }
+    }
 
-for (let j = 0; j < 8; j++) {
-  records.push({
-    ...generateSensorRecord(),
-    srvtime: baseTime + j * 60000, // 1-minute intervals
-  });
-}
-
-
-    const latest = records[records.length - 1];
+    const lastValid =
+      records
+        .slice()
+        .reverse()
+        .find((r) => r.sPM2 !== null) || generateValidRecord(baseTime);
 
     devices.push({
       db: "admin",
       status: 200,
       dID: `SG${i}`,
       data: records,
-      min: { ...latest },
-      max: { ...latest },
+      min: { ...lastValid },
+      max: { ...lastValid },
     });
   }
 
@@ -82,22 +103,36 @@ for (let j = 0; j < 8; j++) {
   };
 }
 
-/* Final mock API response */
-export const mockApiResponse = generateMockDevices(10);
-export function convertToChartData(api: ApiResponse) {
-  return api.data.map((device) => {
-    const latest = device.data.find(
-      (d) => d.sPM2 !== null
-    ) || device.data[device.data.length - 1];
+export const mockApiResponse = generateMockDevices(12);
 
-    return {
-      device: device.dID,
-      sPM2: latest?.sPM2,
-      sPM1: latest?.sPM1,
-      sPM10: latest?.sPM10,
-      temp: latest?.temp,
-      rh: latest?.rh,
-      srvtime: latest?.srvtime,
-    };
+/* ---------------- CONVERTER FOR CHART ---------------- */
+
+export function convertToChartData(api: ApiResponse) {
+  const result: any[] = [];
+
+  api.data.forEach((device) => {
+    device.data.forEach((record) => {
+      // Only include records that have time + values
+      if (record.srvtime && record.sPM2 !== null) {
+        result.push({
+          device: device.dID,
+          srvtime: record.srvtime,
+          sPM2: record.sPM2,
+          sPM1: record.sPM1,
+          sPM10: record.sPM10,
+          temp: record.temp,
+          rh: record.rh,
+          co_ppb: record.co_ppb,
+          so2_ppb: record.so2_ppb,
+          o3_ppb_compensated: record.o3_ppb_compensated,
+          no2_ppb: record.no2_ppb,
+          rs485_data: record.rs485_data,
+          sVocI: record.sVocI,
+          k30Co2: record.k30Co2,
+        });
+      }
+    });
   });
+
+  return result;
 }

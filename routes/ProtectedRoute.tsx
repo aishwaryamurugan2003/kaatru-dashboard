@@ -9,11 +9,14 @@ export default function ProtectedRoute({
 }) {
   const token = localStorage.getItem("token");
 
-  // If no token or expired token → redirect to login
-  if (!token || !isTokenAlive(token)) {
+  if (!token) {
     return <Navigate to="/" replace />;
   }
 
-  // Otherwise allow access
+  if (!isTokenAlive(token)) {
+    localStorage.removeItem("token");
+    return <Navigate to="/" replace />;
+  }
+
   return <>{children}</>;
 }
