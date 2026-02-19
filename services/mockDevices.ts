@@ -108,31 +108,25 @@ export const mockApiResponse = generateMockDevices(12);
 /* ---------------- CONVERTER FOR CHART ---------------- */
 
 export function convertToChartData(api: ApiResponse) {
-  const result: any[] = [];
+  const map: Record<number, number[]> = {};
 
   api.data.forEach((device) => {
     device.data.forEach((record) => {
-      // Only include records that have time + values
       if (record.srvtime && record.sPM2 !== null) {
-        result.push({
-          device: device.dID,
-          srvtime: record.srvtime,
-          sPM2: record.sPM2,
-          sPM1: record.sPM1,
-          sPM10: record.sPM10,
-          temp: record.temp,
-          rh: record.rh,
-          co_ppb: record.co_ppb,
-          so2_ppb: record.so2_ppb,
-          o3_ppb_compensated: record.o3_ppb_compensated,
-          no2_ppb: record.no2_ppb,
-          rs485_data: record.rs485_data,
-          sVocI: record.sVocI,
-          k30Co2: record.k30Co2,
-        });
+        if (!map[record.srvtime]) {
+          map[record.srvtime] = [];
+        }
+        map[record.srvtime].push(record.sPM2);
       }
     });
   });
 
-  return result;
+  const result = Object.entries(map).map(([time, values]) => ({
+    srvtime: Number(time),
+    sPM2:
+      values.reduce((a, b) => a + b, 0) / values.length,
+  }));
+
+  return result.sort((a, b) => a.srvtime - b.srvtime);
 }
+
