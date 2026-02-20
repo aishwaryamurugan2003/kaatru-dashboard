@@ -73,13 +73,9 @@ function generateMockDevices(count: number): ApiResponse {
     const baseTime = Date.now() - 30 * 60 * 1000;
     const records: SensorRecord[] = [];
 
-    for (let j = 0; j < 8; j++) {
-      if (j % 3 === 0) {
-        records.push(generateValidRecord(baseTime + j * 60000));
-      } else {
-        records.push(generateNullRecord());
-      }
-    }
+  for (let j = 0; j < 20; j++) {
+  records.push(generateValidRecord(baseTime + j * 60000));
+}
 
     const lastValid =
       records
@@ -105,28 +101,66 @@ function generateMockDevices(count: number): ApiResponse {
 
 export const mockApiResponse = generateMockDevices(12);
 
-/* ---------------- CONVERTER FOR CHART ---------------- */
+/* ---------------- CONVERTERS FOR CHARTS ---------------- */
 
-export function convertToChartData(api: ApiResponse) {
+/* 1️⃣ Time Series (For Line / Area Charts) */
+export type TimeSeriesPoint = {
+  srvtime: number;
+  sPM2: number;
+};
+
+export function convertToTimeSeries(
+  api: ApiResponse,
+  field: keyof SensorRecord
+) {
   const map: Record<number, number[]> = {};
 
   api.data.forEach((device) => {
     device.data.forEach((record) => {
-      if (record.srvtime && record.sPM2 !== null) {
+      const value = record[field];
+
+      if (record.srvtime && typeof value === "number") {
         if (!map[record.srvtime]) {
           map[record.srvtime] = [];
         }
-        map[record.srvtime].push(record.sPM2);
+        map[record.srvtime].push(value);
       }
     });
   });
 
-  const result = Object.entries(map).map(([time, values]) => ({
-    srvtime: Number(time),
-    sPM2:
-      values.reduce((a, b) => a + b, 0) / values.length,
-  }));
-
-  return result.sort((a, b) => a.srvtime - b.srvtime);
+  return Object.entries(map)
+    .map(([time, values]) => ({
+      srvtime: Number(time),
+      [field]:
+        values.reduce((sum, v) => sum + v, 0) / values.length,
+    }))
+    .sort((a, b) => a.srvtime - b.srvtime);
 }
 
+/* 2️⃣ Device Summary (For Pie / Radar Charts) */
+export type DeviceSummary = {
+  device: string;
+  sPM2: number;
+};
+
+export function convertToDeviceSummary(
+  api: ApiResponse,
+  field: keyof SensorRecord
+) {
+  return api.data.map((device) => {
+    const valid = device.data.filter(
+      (record) => typeof record[field] === "number"
+    );
+
+    const avg =
+      valid.reduce(
+        (sum, record) => sum + (record[field] as number),
+        0
+      ) / (valid.length || 1);
+
+    return {
+      device: device.dID,
+      [field]: avg,
+    };
+  });
+}

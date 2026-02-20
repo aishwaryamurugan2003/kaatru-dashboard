@@ -10,7 +10,7 @@ import {
   PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer
 } from "recharts";
-import { mockApiResponse, convertToChartData } from "../services/mockDevices";
+import { mockApiResponse, convertToDeviceSummary, convertToTimeSeries } from "../services/mockDevices";
 
 function formatTime(value: any) {
   if (!value) return "";
@@ -33,9 +33,8 @@ const STORAGE_KEY = "customCharts";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
-const mockDevices = convertToChartData(mockApiResponse).sort(
-  (a, b) => (a.srvtime ?? 0) - (b.srvtime ?? 0)
-);
+
+
 
 const fields = [
   "device",
@@ -60,12 +59,19 @@ function RenderChart({ config }: { config: ChartConfig }) {
 
   const isTime = xKey === "srvtime";
 
+  /* ✅ DEFINE DATA HERE */
+const data =
+  type === "line" || type === "scatter"
+    ? convertToTimeSeries(mockApiResponse, yKey as any)
+    : convertToDeviceSummary(mockApiResponse, yKey as any);
+
   return (
     <div className="bg-white rounded-xl shadow p-4 h-[320px]">
       <ResponsiveContainer width="100%" height="100%">
         <>
+
           {type === "line" && (
-            <LineChart data={mockDevices}>
+            <LineChart data={data}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
                 dataKey={xKey}
@@ -78,21 +84,20 @@ function RenderChart({ config }: { config: ChartConfig }) {
               <YAxis />
               <Tooltip />
               <Legend />
-              <Line dataKey={yKey} stroke="#3b82f6" dot />
+              <Line
+                type="monotone"
+                dataKey={yKey}
+                stroke="#3b82f6"
+                strokeWidth={3}
+                dot={false}
+              />
             </LineChart>
           )}
 
           {type === "bar" && (
-            <BarChart data={mockDevices}>
+            <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey={xKey}
-                type={isTime ? "number" : "category"}
-                domain={isTime ? ["auto", "auto"] : undefined}
-                tickFormatter={(value) =>
-                  isTime ? formatTime(value) : value
-                }
-              />
+              <XAxis dataKey={xKey} />
               <YAxis />
               <Tooltip />
               <Legend />
@@ -100,37 +105,24 @@ function RenderChart({ config }: { config: ChartConfig }) {
             </BarChart>
           )}
 
-          {type === "pie" && (() => {
-            const pieData = Object.values(
-              mockDevices.reduce((acc: any, item: any) => {
-                acc[item.device] = acc[item.device] || {
-                  device: item.device,
-                  value: 0,
-                };
-                acc[item.device].value += item[yKey] || 0;
-                return acc;
-              }, {})
-            );
-
-            return (
-              <PieChart>
-                <Tooltip />
-                <Legend verticalAlign="bottom" />
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="device"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                >
-                  {pieData.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
-                </Pie>
-              </PieChart>
-            );
-          })()}
+          {type === "pie" && (
+            <PieChart>
+              <Tooltip />
+              <Legend verticalAlign="bottom" />
+              <Pie
+                data={data}
+                dataKey={yKey}
+                nameKey={xKey}
+                cx="50%"
+                cy="50%"
+                outerRadius={100}
+              >
+                {data.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Pie>
+            </PieChart>
+          )}
 
           {type === "scatter" && (
             <ScatterChart>
@@ -138,50 +130,38 @@ function RenderChart({ config }: { config: ChartConfig }) {
               <XAxis
                 dataKey={xKey}
                 type={isTime ? "number" : "category"}
-                domain={isTime ? ["auto", "auto"] : undefined}
                 tickFormatter={(value) =>
                   isTime ? formatTime(value) : value
                 }
               />
-              <YAxis type="number" dataKey={yKey} />
+              <YAxis dataKey={yKey} />
               <Tooltip />
-              <Scatter data={mockDevices} fill="#f59e0b" />
+              <Scatter data={data} fill="#f59e0b" />
             </ScatterChart>
           )}
 
           {type === "composed" && (
-            <ComposedChart data={mockDevices}>
+            <ComposedChart data={data}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey={xKey}
-                type={isTime ? "number" : "category"}
-                domain={isTime ? ["auto", "auto"] : undefined}
-                tickFormatter={(value) =>
-                  isTime ? formatTime(value) : value
-                }
-              />
+              <XAxis dataKey={xKey} />
               <YAxis />
               <Tooltip />
               <Legend />
               <Bar dataKey={yKey} fill="#10b981" />
-              <Line dataKey={yKey} stroke="#3b82f6" dot />
+              <Line dataKey={yKey} stroke="#3b82f6" />
             </ComposedChart>
           )}
 
           {type === "radar" && (
-            <RadarChart data={mockDevices}>
+            <RadarChart data={data}>
               <PolarGrid />
-              <PolarAngleAxis
-                dataKey={xKey}
-                tickFormatter={(value) =>
-                  isTime ? formatTime(value) : value
-                }
-              />
+              <PolarAngleAxis dataKey={xKey} />
               <PolarRadiusAxis />
               <Radar dataKey={yKey} fill="#3b82f6" fillOpacity={0.5} />
               <Legend />
             </RadarChart>
           )}
+
         </>
       </ResponsiveContainer>
     </div>
