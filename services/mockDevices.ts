@@ -101,9 +101,7 @@ function generateMockDevices(count: number): ApiResponse {
 
 export const mockApiResponse = generateMockDevices(12);
 
-/* ---------------- CONVERTERS FOR CHARTS ---------------- */
 
-/* 1️⃣ Time Series (For Line / Area Charts) */
 export type TimeSeriesPoint = {
   srvtime: number;
   sPM2: number;
@@ -137,7 +135,6 @@ export function convertToTimeSeries(
     .sort((a, b) => a.srvtime - b.srvtime);
 }
 
-/* 2️⃣ Device Summary (For Pie / Radar Charts) */
 export type DeviceSummary = {
   device: string;
   sPM2: number;
