@@ -12,11 +12,58 @@ interface Option {
 const SELECT_ALL_VALUE = "__ALL__";
 
 const deviceSelectStyles = {
+  control: (base: any) => ({
+    ...base,
+    backgroundColor: "#f3f4f6",
+    border: "1px solid #e5e7eb",
+    borderRadius: "12px",
+    minHeight: "44px",
+    boxShadow: "none",
+    "&:hover": {
+      border: "1px solid #d1d5db",
+    },
+  }),
+
   valueContainer: (base: any) => ({
     ...base,
-    maxHeight: "120px",
+    padding: "6px 10px",
+    gap: "6px",
+
+    /* ✅ SCROLL BACK */
+    maxHeight: "110px",
     overflowY: "auto",
+    flexWrap: "wrap",
   }),
+
+  multiValue: (base: any) => ({
+    ...base,
+    backgroundColor: "#e0edff",
+    borderRadius: "9999px",
+    padding: "2px 10px",
+    alignItems: "center",
+  }),
+
+  multiValueLabel: (base: any) => ({
+    ...base,
+    color: "#2563eb",
+    fontWeight: 600,
+    fontSize: "14px",
+    padding: 0,
+  }),
+
+  multiValueRemove: () => ({
+    display: "none",
+  }),
+
+  indicatorSeparator: () => ({
+    display: "none",
+  }),
+
+  dropdownIndicator: (base: any) => ({
+    ...base,
+    color: "#6b7280",
+  }),
+
   menu: (base: any) => ({
     ...base,
     zIndex: 9999,

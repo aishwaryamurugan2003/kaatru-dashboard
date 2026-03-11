@@ -137,7 +137,9 @@ const columns = [
   ------------------------------------------------------------ */
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold mb-6">Device Management</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-gray-800 mb-6">
+  Device Management
+</h1>
 
       <div className="flex justify-between mb-6">
         <input

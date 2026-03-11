@@ -191,7 +191,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
               </svg>
             }
           />
-          <NavItem
+          {/* <NavItem
   to="/data-visualization"
   isExpanded={isOpen}
   label="Data Visualization"
@@ -205,7 +205,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
       />
     </svg>
   }
-/>
+/> */}
 <NavItem
   to="/realtime-dashboard"
   isExpanded={isOpen}

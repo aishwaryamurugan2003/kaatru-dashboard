@@ -267,10 +267,10 @@ const chartData = useMemo(() => {
   placeholder="Select Group"
   className="w-64"
 />
-
-
 <Select
   isMulti
+  closeMenuOnSelect={false}
+  hideSelectedOptions={false}
   options={groupDevices.map((id) => ({
     label: id,
     value: id,
@@ -287,11 +287,54 @@ const chartData = useMemo(() => {
   placeholder="Select Devices"
   className="w-full min-w-[400px]"
   styles={{
+    control: (base) => ({
+      ...base,
+      backgroundColor: "#e5e7eb",
+      border: "1px solid #d1d5db",
+      borderRadius: "12px",
+      minHeight: "120px", // tall box
+      alignItems: "flex-start",
+      boxShadow: "none",
+    }),
+
     valueContainer: (base) => ({
       ...base,
+      padding: "12px",
+      gap: "10px",
+      flexWrap: "wrap",
       maxHeight: "120px",
-      overflowY: "auto",
+      overflowY: "auto", // internal scroll
+      alignContent: "flex-start",
     }),
+
+    multiValue: (base) => ({
+      ...base,
+      backgroundColor: "#dbeafe",
+      borderRadius: "9999px",
+      padding: "4px 12px",
+    }),
+
+    multiValueLabel: (base) => ({
+      ...base,
+      color: "#2563eb",
+      fontWeight: 600,
+      fontSize: "14px",
+      padding: 0,
+    }),
+
+    multiValueRemove: (base) => ({
+      ...base,
+      color: "#2563eb",
+      ":hover": {
+        backgroundColor: "transparent",
+        color: "#1d4ed8",
+      },
+    }),
+
+    indicatorSeparator: () => ({
+      display: "none",
+    }),
+
     menu: (base) => ({
       ...base,
       zIndex: 9999,

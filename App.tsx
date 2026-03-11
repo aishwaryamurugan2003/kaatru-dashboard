@@ -6,7 +6,7 @@ import Header from "./components/Header";
 import DataAnalysisPage from "./pages/DataAnalysisPage";
 import LoginPage from "./pages/LoginPage";
 import DeviceAdministrationPage from "./pages/DeviceAdministrationPage";
-import DataVisualizationPage from "./pages/DataVisualizationPage";
+// import DataVisualizationPage from "./pages/DataVisualizationPage";
 import RealtimeDashboardPage from "./pages/RealtimeDashboardPage";
 import ChartCustomizationPage from "./pages/ChartCustomizationPage"; // ✅ NEW
 
@@ -71,17 +71,6 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <DeviceAdministrationPage />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/data-visualization"
-          element={
-            <ProtectedRoute>
-              <DashboardLayout>
-                <DataVisualizationPage />
               </DashboardLayout>
             </ProtectedRoute>
           }
