@@ -54,8 +54,10 @@ const columns = [
     title: "Username",
     dataIndex: "username",
     render: (text: string) => (
-      <span className="text-lg font-medium">{text}</span>
-    ),
+  <span className="font-sans text-sm font-medium text-gray-800">
+    {text}
+  </span>
+),
   },
 
   {
@@ -63,18 +65,20 @@ const columns = [
     dataIndex: "groups",
     key: "groups",
     render: (_, record) => (
-      <div className="text-lg">
-        <GroupChips access={record.access} />
-      </div>
-    ),
+  <div className="font-sans text-sm">
+    <GroupChips access={record.access} />
+  </div>
+),
   },
 
   {
     title: "Email Address",
     dataIndex: "email",
     render: (text: string) => (
-      <span className="text-lg">{text}</span>
-    ),
+  <span className="font-sans text-sm text-gray-700">
+    {text}
+  </span>
+),
   },
 
   {
@@ -158,7 +162,7 @@ const columns = [
       </div>
 
       <div className="bg-white shadow rounded-lg p-4">
-        <Table
+       <Table
   columns={columns}
   dataSource={users.filter((u) =>
     [u.username, u.email, u.groups]
@@ -167,7 +171,8 @@ const columns = [
       .includes(searchText.toLowerCase())
   )}
   pagination={{ pageSize: 10 }}
-  className="text-base"
+  className="font-sans text-sm"
+  rowClassName={() => "font-sans text-sm"}
 />
 
       </div>

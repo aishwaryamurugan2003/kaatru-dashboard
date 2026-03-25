@@ -82,6 +82,52 @@ const filteredDevices = useMemo(() => {
   return result;
 }, [devices, selectedDevices]);
 
+// const deviceStats = useMemo(() => {
+//   const total = selectedDevices.length;
+
+//   const active = selectedDevices.filter((id) => devices[id]).length;
+//   const inactive = total - active;
+
+//   return {
+//     total,
+//     active,
+//     inactive,
+//   };
+// }, [devices, selectedDevices]);
+const ACTIVE_THRESHOLD = 60 * 1000; // 60 seconds
+
+const deviceStats = useMemo(() => {
+  const total = selectedDevices.length;
+  const now = Date.now();
+
+  let active = 0;
+
+  selectedDevices.forEach((id) => {
+    const d = devices[id];
+
+    if (!d) return;
+
+    const lastSeen = Number(d.srvtime || 0);
+
+    if (now - lastSeen <= ACTIVE_THRESHOLD) {
+      active++;
+    }
+  });
+
+  const inactive = total - active;
+
+  return {
+    total,
+    active,
+    inactive,
+  };
+}, [devices, selectedDevices]);
+
+const isStatsLoading =
+  selectedGroup &&
+  selectedDevices.length > 0 &&
+  Object.keys(devices).length === 0;
+
 
 
   const isRealtimeLoading =
@@ -365,6 +411,27 @@ const chartData = useMemo(() => {
 </div>
 </div>
 
+{/* STATUS CARDS */}
+<div className="grid grid-cols-3 gap-4">
+  <StatusCard
+    label="Total Devices"
+    value={deviceStats.total}
+    loading={isStatsLoading}
+  />
+  <StatusCard
+    label="Active Devices"
+    value={deviceStats.active}
+    loading={isStatsLoading}
+    color="green"
+  />
+  <StatusCard
+    label="Inactive Devices"
+    value={deviceStats.inactive}
+    loading={isStatsLoading}
+    color="red"
+  />
+</div>
+
 
 
 
@@ -500,4 +567,35 @@ const SensorCard = ({
   </div>
 );
 
+const StatusCard = ({
+  label,
+  value,
+  loading,
+  color = "blue",
+}: {
+  label: string;
+  value: number;
+  loading: boolean;
+  color?: "blue" | "green" | "red";
+}) => {
+  const colorMap = {
+    blue: "text-blue-600",
+    green: "text-green-600",
+    red: "text-red-600",
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-5">
+      <div className="text-sm text-gray-500 mb-2">{label}</div>
+
+      {loading ? (
+        <div className="animate-pulse h-8 w-16 bg-gray-300 rounded" />
+      ) : (
+        <div className={`text-3xl font-bold ${colorMap[color]}`}>
+          {value}
+        </div>
+      )}
+    </div>
+  );
+};
 export default RealtimeDashboardPage;
