@@ -279,3 +279,27 @@ export const apiService: ApiService =
   import.meta.env.VITE_APP_STATE === "PRODUCTION"
     ? new Production()
     : new Mock();
+/* ------------------------------------------------------------
+   🔥 CONVERT API → CHART DATA
+------------------------------------------------------------ */
+export function convertHistoryToTimeSeries(api: any, field: string) {
+  if (!api || !api.data) {
+    console.error("❌ Invalid API response");
+    return [];
+  }
+
+  const rawData = api.data?.[0]?.data || [];
+
+  if (!rawData.length) {
+    console.warn("⚠️ No data received from API");
+    return [];
+  }
+
+  return rawData
+    .filter((entry: any) => typeof entry[field] === "number" && entry.srvtime)
+    .map((entry: any) => ({
+      srvtime: entry.srvtime,
+      [field]: entry[field] === 0 ? 0.01 : entry[field],
+    }))
+    .sort((a: any, b: any) => a.srvtime - b.srvtime);
+}

@@ -11,7 +11,7 @@ import {
   ResponsiveContainer
 } from "recharts";
 import { mockApiResponse, convertToDeviceSummary, convertToTimeSeries } from "../services/mockDevices";
-
+import { apiService, convertHistoryToTimeSeries } from "@/services/api";
 function formatTime(value: any) {
   if (!value) return "";
   const date = new Date(value);
@@ -54,36 +54,242 @@ const fields = [
 ];
 
 /* ---------------- CHART RENDERER ---------------- */
+// function RenderChart({ config }: { config: ChartConfig }) {
+//   const { type, xKey, yKey } = config;
+//   const isTime = xKey === "srvtime";
+
+//   /* ✅ DEFINE DATA HERE */
+// const [data, setData] = useState<any[]>([]);
+
+// const [loading, setLoading] = useState(false);
+
+// useEffect(() => {
+//   async function load() {
+//     if (!yKey || yKey === "device") return;
+
+//     setLoading(true);
+
+//     try {
+//       const api = await apiService.fetchSensorHistory("SG36", "15M");
+//       const result = convertHistoryToTimeSeries(api, yKey);
+//       setData(result);
+//     } catch (e) {
+//       console.error("API ERROR", e);
+//     }
+
+//     setLoading(false);
+//   }
+
+//   load();
+// }, [yKey]);
+
+// if (!data.length) {
+//   return (
+//     <div className="flex items-center justify-center h-[300px] text-gray-500">
+//       No data available
+//     </div>
+//   );
+// }
+
+//   return (
+//     <div className="bg-white rounded-xl shadow p-4 h-[320px]">
+//       <ResponsiveContainer width="100%" height={300}>
+//         <>
+
+//           {type === "line" && (
+//             // <LineChart data={data}>
+//             //   <CartesianGrid strokeDasharray="3 3" />
+//             //   <XAxis
+//             //     dataKey={xKey}
+//             //     type={isTime ? "number" : "category"}
+//             //     domain={isTime ? ["auto", "auto"] : undefined}
+//             //     tickFormatter={(value) =>
+//             //       isTime ? formatTime(value) : value
+//             //     }
+//             //   />
+//             //   <YAxis />
+//             //   <Tooltip />
+//             //   <Legend />
+//             //   <Line
+//             //     type="monotone"
+//             //     dataKey={yKey}
+//             //     stroke="#3b82f6"
+//             //     strokeWidth={3}
+//             //     dot={false}
+//             //   />
+//             // </LineChart>
+//             <LineChart data={data}>
+//   <CartesianGrid strokeDasharray="3 3" />
+
+//   <XAxis
+//     dataKey="srvtime"
+//     type="number"
+//     domain={["auto", "auto"]}
+//     tickFormatter={(value) => formatTime(value)}
+//   />
+
+//   <YAxis />
+
+//   {/* ✅ ADD TOOLTIP HERE */}
+//   <Tooltip
+//     labelFormatter={(value) => formatTime(value)}
+//     formatter={(value: number) => value.toFixed(2)}
+//   />
+
+//   <Legend />
+
+//   <Line
+//     type="monotone"
+//     dataKey={yKey}
+//     stroke="#3b82f6"
+//     strokeWidth={3}
+//     dot={false}
+//   />
+// </LineChart>
+//           )}
+
+//           {type === "bar" && (
+//             <BarChart data={data}>
+//               <CartesianGrid strokeDasharray="3 3" />
+//               <XAxis dataKey={xKey} />
+//               <YAxis />
+//               <Tooltip />
+//               <Legend />
+//               <Bar dataKey={yKey} fill="#10b981" />
+//             </BarChart>
+//           )}
+
+//           {type === "pie" && (
+//             <PieChart>
+//               <Tooltip />
+//               <Legend verticalAlign="bottom" />
+//               <Pie
+//                 data={data}
+//                 dataKey={yKey}
+//                 nameKey={xKey}
+//                 cx="50%"
+//                 cy="50%"
+//                 outerRadius={100}
+//               >
+//                 {data.map((_, i) => (
+//                   <Cell key={i} fill={COLORS[i % COLORS.length]} />
+//                 ))}
+//               </Pie>
+//             </PieChart>
+//           )}
+
+//           {type === "scatter" && (
+//             <ScatterChart>
+//               <CartesianGrid />
+//               <XAxis
+//                 dataKey={xKey}
+//                 type={isTime ? "number" : "category"}
+//                 tickFormatter={(value) =>
+//                   isTime ? formatTime(value) : value
+//                 }
+//               />
+//               <YAxis dataKey={yKey} />
+//               <Tooltip />
+//               <Scatter data={data} fill="#f59e0b" />
+//             </ScatterChart>
+//           )}
+
+//           {type === "composed" && (
+//             <ComposedChart data={data}>
+//               <CartesianGrid strokeDasharray="3 3" />
+//               <XAxis dataKey={xKey} />
+//               <YAxis />
+//               <Tooltip />
+//               <Legend />
+//               <Bar dataKey={yKey} fill="#10b981" />
+//               <Line dataKey={yKey} stroke="#3b82f6" />
+//             </ComposedChart>
+//           )}
+
+//           {type === "radar" && (
+//             <RadarChart data={data}>
+//               <PolarGrid />
+//               <PolarAngleAxis dataKey={xKey} />
+//               <PolarRadiusAxis />
+//               <Radar dataKey={yKey} fill="#3b82f6" fillOpacity={0.5} />
+//               <Legend />
+//             </RadarChart>
+//           )}
+
+//         </>
+//       </ResponsiveContainer>
+//     </div>
+//   );
+// }
 function RenderChart({ config }: { config: ChartConfig }) {
   const { type, xKey, yKey } = config;
 
-  const isTime = xKey === "srvtime";
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  /* ✅ DEFINE DATA HERE */
-const data =
-  type === "line" || type === "scatter"
-    ? convertToTimeSeries(mockApiResponse, yKey as any)
-    : convertToDeviceSummary(mockApiResponse, yKey as any);
+  useEffect(() => {
+    async function load() {
+      if (!yKey || yKey === "device") return;
+
+      setLoading(true);
+
+      try {
+        const api = await apiService.fetchSensorHistory("SG36", "15M");
+        const result = convertHistoryToTimeSeries(api, yKey);
+        setData(result);
+      } catch (e) {
+        console.error("API ERROR", e);
+      }
+
+      setLoading(false);
+    }
+
+    load();
+  }, [yKey]);
+
+  /* ✅ FIX 1: LOADING FIRST */
+  if (loading) {
+    return (
+      <div className="h-[300px] flex items-center justify-center text-gray-500">
+        Loading...
+      </div>
+    );
+  }
+
+  /* ✅ FIX 2: NO DATA AFTER LOADING */
+  if (!data.length) {
+    return (
+      <div className="flex items-center justify-center h-[300px] text-gray-500">
+        No data available
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow p-4 h-[320px]">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height={300}>
         <>
-
+          {/* ---------------- LINE CHART ---------------- */}
           {type === "line" && (
             <LineChart data={data}>
               <CartesianGrid strokeDasharray="3 3" />
+
               <XAxis
-                dataKey={xKey}
-                type={isTime ? "number" : "category"}
-                domain={isTime ? ["auto", "auto"] : undefined}
-                tickFormatter={(value) =>
-                  isTime ? formatTime(value) : value
-                }
+                dataKey="srvtime"
+                type="number"
+                domain={["auto", "auto"]}
+                tickFormatter={(value) => formatTime(value)}
               />
+
               <YAxis />
-              <Tooltip />
+
+              <Tooltip
+                labelFormatter={(value) => formatTime(value)}
+                formatter={(value: number) => value.toFixed(2)}
+              />
+
               <Legend />
+
               <Line
                 type="monotone"
                 dataKey={yKey}
@@ -94,74 +300,125 @@ const data =
             </LineChart>
           )}
 
+          {/* ---------------- BAR CHART ---------------- */}
           {type === "bar" && (
-            <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey={xKey} />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey={yKey} fill="#10b981" />
-            </BarChart>
-          )}
+  <BarChart data={data}>
+    <CartesianGrid strokeDasharray="3 3" />
 
-          {type === "pie" && (
-            <PieChart>
-              <Tooltip />
-              <Legend verticalAlign="bottom" />
-              <Pie
-                data={data}
-                dataKey={yKey}
-                nameKey={xKey}
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-              >
-                {data.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
-              </Pie>
-            </PieChart>
-          )}
+    <XAxis
+      dataKey="srvtime"
+      type="number"
+      domain={["auto", "auto"]}
+      tickFormatter={(value) => formatTime(value)}
+    />
 
-          {type === "scatter" && (
-            <ScatterChart>
-              <CartesianGrid />
-              <XAxis
-                dataKey={xKey}
-                type={isTime ? "number" : "category"}
-                tickFormatter={(value) =>
-                  isTime ? formatTime(value) : value
-                }
-              />
-              <YAxis dataKey={yKey} />
-              <Tooltip />
-              <Scatter data={data} fill="#f59e0b" />
-            </ScatterChart>
-          )}
+    <YAxis />
 
-          {type === "composed" && (
-            <ComposedChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey={xKey} />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey={yKey} fill="#10b981" />
-              <Line dataKey={yKey} stroke="#3b82f6" />
-            </ComposedChart>
-          )}
+    <Tooltip
+      labelFormatter={(value) => formatTime(value)}
+      formatter={(value: number) => value.toFixed(2)}
+    />
 
+    <Legend />
+
+    <Bar dataKey={yKey} fill="#10b981" />
+  </BarChart>
+)}
+
+          {/* ---------------- PIE CHART ---------------- */}
+         {type === "pie" && (
+  <PieChart>
+    <Tooltip
+      formatter={(value: number) => value.toFixed(2)}
+    />
+
+    <Legend verticalAlign="bottom" />
+
+    <Pie
+      data={data.map((d, i) => ({
+        name: formatTime(d.srvtime),
+        value: d[yKey],
+      }))}
+      dataKey="value"
+      nameKey="name"
+      cx="50%"
+      cy="50%"
+      outerRadius={100}
+    >
+      {data.map((_, i) => (
+        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+      ))}
+    </Pie>
+  </PieChart>
+)}
+
+          {/* ---------------- SCATTER ---------------- */}
+        {type === "scatter" && (
+  <ScatterChart>
+    <CartesianGrid />
+
+    <XAxis
+      dataKey="srvtime"
+      type="number"
+      tickFormatter={(value) => formatTime(value)}
+    />
+
+    <YAxis dataKey={yKey} />
+
+    <Tooltip
+      labelFormatter={(value) => formatTime(value)}
+      formatter={(value: number) => value.toFixed(2)}
+    />
+
+    <Scatter data={data} fill="#f59e0b" />
+  </ScatterChart>
+)}
+
+          {/* ---------------- COMPOSED ---------------- */}
+         {type === "composed" && (
+  <ComposedChart data={data}>
+    <CartesianGrid strokeDasharray="3 3" />
+
+    <XAxis
+      dataKey="srvtime"
+      type="number"
+      tickFormatter={(value) => formatTime(value)}
+    />
+
+    <YAxis />
+
+    <Tooltip
+      labelFormatter={(value) => formatTime(value)}
+      formatter={(value: number) => value.toFixed(2)}
+    />
+
+    <Legend />
+
+    <Bar dataKey={yKey} fill="#10b981" />
+    <Line dataKey={yKey} stroke="#3b82f6" />
+  </ComposedChart>
+)}
+
+          {/* ---------------- RADAR ---------------- */}
           {type === "radar" && (
-            <RadarChart data={data}>
-              <PolarGrid />
-              <PolarAngleAxis dataKey={xKey} />
-              <PolarRadiusAxis />
-              <Radar dataKey={yKey} fill="#3b82f6" fillOpacity={0.5} />
-              <Legend />
-            </RadarChart>
-          )}
+  <RadarChart
+    data={data.map((d) => ({
+      time: formatTime(d.srvtime),
+      value: d[yKey],
+    }))}
+  >
+    <PolarGrid />
+    <PolarAngleAxis dataKey="time" />
+    <PolarRadiusAxis />
 
+    <Tooltip
+      formatter={(value: number) => value.toFixed(2)}
+    />
+
+    <Radar dataKey="value" fill="#3b82f6" fillOpacity={0.5} />
+    <Legend />
+  </RadarChart>
+)}
         </>
       </ResponsiveContainer>
     </div>
