@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import Select from "react-select";
 import {
   LineChart, Line,
   BarChart, Bar,
@@ -32,8 +33,6 @@ type ChartConfig = {
 const STORAGE_KEY = "customCharts";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
-
-
 
 
 const fields = [
@@ -221,50 +220,101 @@ const fields = [
 //     </div>
 //   );
 // }
-function RenderChart({ config }: { config: ChartConfig }) {
+function RenderChart({
+  config,
+  devices,
+}: {
+  config: ChartConfig;
+  devices: any[];
+}) {
   const { type, xKey, yKey } = config;
 
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // useEffect(() => {
+  //   async function load() {
+  //     if (!yKey || yKey === "device") return;
+
+  //     setLoading(true);
+
+  //     try {
+  //       const api = await apiService.fetchSensorHistory("SG36", "15M");
+  //       const result = convertHistoryToTimeSeries(api, yKey);
+  //       setData(result);
+  //     } catch (e) {
+  //       console.error("API ERROR", e);
+  //     }
+
+  //     setLoading(false);
+  //   }
+
+  //   load();
+  // }, [yKey]);
+
   useEffect(() => {
-    async function load() {
-      if (!yKey || yKey === "device") return;
+  async function load() {
+    if (!yKey || yKey === "device" || devices.length === 0) return;
 
-      setLoading(true);
+    setLoading(true);
 
-      try {
-        const api = await apiService.fetchSensorHistory("SG36", "15M");
-        const result = convertHistoryToTimeSeries(api, yKey);
-        setData(result);
-      } catch (e) {
-        console.error("API ERROR", e);
-      }
+    try {
+      const allData: any[] = [];
 
-      setLoading(false);
+      await Promise.all(
+        devices.map(async (d: any) => {
+          const api = await apiService.fetchSensorHistory(d.value, "15M");
+
+          const result = convertHistoryToTimeSeries(api, yKey);
+
+          const withDevice = result.map((r: any) => ({
+            ...r,
+            device: d.value,
+          }));
+
+          allData.push(...withDevice);
+        })
+      );
+
+      setData(allData);
+    } catch (e) {
+      console.error("API ERROR", e);
     }
 
-    load();
-  }, [yKey]);
-
-  /* ✅ FIX 1: LOADING FIRST */
-  if (loading) {
-    return (
-      <div className="h-[300px] flex items-center justify-center text-gray-500">
-        Loading...
-      </div>
-    );
+    setLoading(false);
   }
 
-  /* ✅ FIX 2: NO DATA AFTER LOADING */
-  if (!data.length) {
-    return (
-      <div className="flex items-center justify-center h-[300px] text-gray-500">
-        No data available
-      </div>
-    );
-  }
+  load();
+}, [yKey, devices]);
 
+
+
+// ✅ FIRST: check devices
+if (!devices.length) {
+  return (
+    <div className="h-[300px] flex items-center justify-center text-gray-500">
+      Select device(s)
+    </div>
+  );
+}
+
+// ✅ SECOND: loading
+if (loading) {
+  return (
+    <div className="h-[300px] flex items-center justify-center text-gray-500">
+      Loading...
+    </div>
+  );
+}
+
+// ✅ THIRD: no data
+if (!data.length) {
+  return (
+    <div className="flex items-center justify-center h-[300px] text-gray-500">
+      No data available
+    </div>
+  );
+}
   return (
     <div className="bg-white rounded-xl shadow p-4 h-[320px]">
       <ResponsiveContainer width="100%" height={300}>
@@ -290,13 +340,19 @@ function RenderChart({ config }: { config: ChartConfig }) {
 
               <Legend />
 
-              <Line
-                type="monotone"
-                dataKey={yKey}
-                stroke="#3b82f6"
-                strokeWidth={3}
-                dot={false}
-              />
+              {devices.map((d, index) => (
+  <Line
+    key={d.value}
+    type="monotone"
+    dataKey={(entry) =>
+      entry.device === d.value ? entry[yKey] : null
+    }
+    stroke={COLORS[index % COLORS.length]}
+    strokeWidth={3}
+    dot={false}
+    name={d.label}
+  />
+))}
             </LineChart>
           )}
 
@@ -432,6 +488,28 @@ export default function ChartCustomizationPage() {
   const [xKey, setXKey] = useState("");
   const [yKey, setYKey] = useState("");
 
+  const [deviceOptions, setDeviceOptions] = useState<any[]>([]);
+  const [selectedDevices, setSelectedDevices] = useState<any[]>([]);
+
+useEffect(() => {
+  async function loadDevices() {
+    try {
+      const devices = await apiService.fetchDevices();
+
+      const formatted = devices.map((d: any) => ({
+        value: d.dID || d.deviceId,
+        label: d.dID || d.deviceId,
+      }));
+
+      setDeviceOptions(formatted);
+    } catch (e) {
+      console.error("DEVICE FETCH ERROR", e);
+    }
+  }
+
+  loadDevices();
+}, []);
+
   /* Load charts from localStorage */
   useEffect(() => {
     try {
@@ -509,6 +587,13 @@ function addChart() {
 
   return (
     <div className="p-6 space-y-6">
+      <Select
+  isMulti
+  options={deviceOptions}
+  value={selectedDevices}
+  onChange={(val) => setSelectedDevices([...(val || [])])}
+  placeholder="Select devices..."
+/>
       <div className="flex gap-3">
         <button
           className="bg-blue-600 text-white px-4 py-2 rounded-lg"
@@ -572,7 +657,7 @@ function addChart() {
             >
               ✕
             </button>
-            <RenderChart config={chart} />
+            <RenderChart config={chart} devices={selectedDevices} />
           </div>
         ))}
       </div>

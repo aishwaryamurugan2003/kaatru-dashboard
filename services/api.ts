@@ -54,6 +54,8 @@ abstract class ApiService {
     filter: string
   ): Promise<any>;
 
+  abstract fetchDevices(): Promise<any[]>;
+
   abstract connectDeviceWebSocket(
     deviceId: string,
     mqttTopic: string,
@@ -159,6 +161,15 @@ async isLoggedIn() {
 
     return res.data;
   }
+
+  async fetchDevices(): Promise<any[]> {
+  const res = await axios.get(Endpoint.GROUP_DEVICES, {
+    headers: this.#getHeaders(),
+  });
+
+  // 🔥 IMPORTANT: adjust based on response
+  return res.data || [];
+}
 
   /* ------------------------------------------------------------
      FETCH USER ACCESS
@@ -267,6 +278,9 @@ class Mock extends ApiService {
   async syncUserAccess() {
     return {};
   }
+  async fetchDevices() {
+  return [];
+}
 
   connectDeviceWebSocket() {}
   disconnectAllWebSockets() {}
