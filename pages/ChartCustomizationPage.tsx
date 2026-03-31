@@ -12,7 +12,7 @@ import {
   ResponsiveContainer
 } from "recharts";
 import { mockApiResponse, convertToDeviceSummary, convertToTimeSeries } from "../services/mockDevices";
-import { apiService, convertHistoryToTimeSeries } from "@/services/api";
+import { apiService, convertHistoryToTimeSeries, Endpoint } from "@/services/api";
 function formatTime(value: any) {
   if (!value) return "";
   const date = new Date(value);
@@ -232,27 +232,7 @@ function RenderChart({
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // useEffect(() => {
-  //   async function load() {
-  //     if (!yKey || yKey === "device") return;
-
-  //     setLoading(true);
-
-  //     try {
-  //       const api = await apiService.fetchSensorHistory("SG36", "15M");
-  //       const result = convertHistoryToTimeSeries(api, yKey);
-  //       setData(result);
-  //     } catch (e) {
-  //       console.error("API ERROR", e);
-  //     }
-
-  //     setLoading(false);
-  //   }
-
-  //   load();
-  // }, [yKey]);
-
-  useEffect(() => {
+useEffect(() => {
   async function load() {
     if (!yKey || yKey === "device" || devices.length === 0) return;
 
@@ -286,6 +266,7 @@ function RenderChart({
 
   load();
 }, [yKey, devices]);
+
 
 
 
@@ -490,25 +471,83 @@ export default function ChartCustomizationPage() {
 
   const [deviceOptions, setDeviceOptions] = useState<any[]>([]);
   const [selectedDevices, setSelectedDevices] = useState<any[]>([]);
+  const [groupOptions, setGroupOptions] = useState<any[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
 
+  useEffect(() => {
+  async function loadGroups() {
+    try {
+      const res = await apiService.getRamanAnalysis(
+        Endpoint.GROUP_ALL
+      );
+
+      if (Array.isArray(res?.data)) {
+        setGroupOptions(
+          res.data.map((g: any) => ({
+            label: g.name,
+            value: g.id,
+          }))
+        );
+      }
+    } catch (e) {
+      console.error("GROUP FETCH ERROR", e);
+    }
+  }
+
+  loadGroups();
+}, []);
+
+
+
+/* ✅ ADD HERE */
 useEffect(() => {
   async function loadDevices() {
+    if (!selectedGroup) {
+      setDeviceOptions([]);
+      setSelectedDevices([]);
+      return;
+    }
+
     try {
-      const devices = await apiService.fetchDevices();
+      const res = await apiService.getRamanAnalysis(
+        Endpoint.GROUP_DEVICES,
+        { id: selectedGroup.value }
+      );
 
-      const formatted = devices.map((d: any) => ({
-        value: d.dID || d.deviceId,
-        label: d.dID || d.deviceId,
-      }));
+      if (res?.data?.devices) {
+        const formatted = res.data.devices.map((d: string) => ({
+          value: d,
+          label: d,
+        }));
 
-      setDeviceOptions(formatted);
+        setDeviceOptions(formatted);
+      }
     } catch (e) {
       console.error("DEVICE FETCH ERROR", e);
     }
   }
 
   loadDevices();
-}, []);
+}, [selectedGroup]);
+
+// useEffect(() => {
+//   async function loadDevices() {
+//     try {
+//       const devices = await apiService.fetchDevices();
+
+//       const formatted = devices.map((d: any) => ({
+//         value: d.dID || d.deviceId,
+//         label: d.dID || d.deviceId,
+//       }));
+
+//       setDeviceOptions(formatted);
+//     } catch (e) {
+//       console.error("DEVICE FETCH ERROR", e);
+//     }
+//   }
+
+//   loadDevices();
+// }, []);
 
   /* Load charts from localStorage */
   useEffect(() => {
@@ -586,14 +625,24 @@ function addChart() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <Select
-  isMulti
-  options={deviceOptions}
-  value={selectedDevices}
-  onChange={(val) => setSelectedDevices([...(val || [])])}
-  placeholder="Select devices..."
-/>
+   <div className="p-6 space-y-6">
+
+  {/* ✅ GROUP DROPDOWN */}
+  <Select
+    options={groupOptions}
+    value={selectedGroup}
+    onChange={(val) => setSelectedGroup(val)}
+    placeholder="Select group..."
+  />
+
+  {/* ✅ DEVICE DROPDOWN */}
+  <Select
+    isMulti
+    options={deviceOptions}
+    value={selectedDevices}
+    onChange={(val) => setSelectedDevices([...(val || [])])}
+    placeholder="Select devices..."
+  />
       <div className="flex gap-3">
         <button
           className="bg-blue-600 text-white px-4 py-2 rounded-lg"
