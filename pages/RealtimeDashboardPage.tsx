@@ -123,6 +123,56 @@ const deviceStats = useMemo(() => {
   };
 }, [devices, selectedDevices]);
 
+const deviceMetaMap = useMemo(() => {
+  const map: Record<string, any> = {};
+
+  groupDevices.forEach((d: any) => {
+    map[d.id] = d;
+  });
+
+  return map;
+}, [groupDevices]);
+
+const deviceTypeStats = useMemo(() => {
+  const now = Date.now();
+
+  let mobileTotal = 0;
+  let mobileActive = 0;
+
+  let stationaryTotal = 0;
+  let stationaryActive = 0;
+
+  selectedDevices.forEach((id) => {
+    const d = devices[id];
+
+    const type =
+      deviceMetaMap[id]?.type ||
+      (id.toUpperCase().startsWith("M") ? "mobile" : "stationary");
+
+    const isActive =
+      d && now - Number(d.srvtime || 0) <= ACTIVE_THRESHOLD;
+
+    if (type === "mobile") {
+      mobileTotal++;
+      if (isActive) mobileActive++;
+    } else {
+      stationaryTotal++;
+      if (isActive) stationaryActive++;
+    }
+  });
+
+  return {
+    mobile: {
+      total: mobileTotal,
+      active: mobileActive,
+    },
+    stationary: {
+      total: stationaryTotal,
+      active: stationaryActive,
+    },
+  };
+}, [devices, selectedDevices, deviceMetaMap]);
+
 const isStatsLoading =
   selectedGroup &&
   selectedDevices.length > 0 &&
@@ -247,8 +297,24 @@ const chartData = useMemo(() => {
         );
 
         const devs = res.data.devices || [];
-        setGroupDevices(devs);
-        setSelectedDevices(devs);
+        const deviceDetails = await Promise.all(
+  devs.map(async (id: string) => {
+    try {
+      const res = await apiService.get("/device", { id });
+
+      const d = res.data.device?.[0];
+
+      return {
+        id,
+        type: d?.device_type?.toLowerCase() || "stationary",
+      };
+    } catch {
+      return { id, type: "stationary" };
+    }
+  })
+);
+        setGroupDevices(deviceDetails);
+        setSelectedDevices(deviceDetails.map(d => d.id));
         setSelectedDeviceId(null);
         setAutoRotate(true);
         setFlipped(false);
@@ -317,10 +383,10 @@ const chartData = useMemo(() => {
   isMulti
   closeMenuOnSelect={false}
   hideSelectedOptions={false}
-  options={groupDevices.map((id) => ({
-    label: id,
-    value: id,
-  }))}
+  options={groupDevices.map((d: any) => ({
+  label: d.id,
+  value: d.id,
+}))}
   value={selectedDevices.map((id) => ({
     label: id,
     value: id,
@@ -430,6 +496,37 @@ const chartData = useMemo(() => {
     loading={isStatsLoading}
     color="red"
   />
+</div>
+
+{/* DEVICE TYPE CARDS */}
+<div className="grid grid-cols-2 gap-4">
+
+  {/* MOBILE */}
+  <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-5 text-center">
+    <div className="text-gray-500 mb-2">Mobile Devices</div>
+
+    {isStatsLoading ? (
+      <div className="animate-pulse h-8 w-20 bg-gray-300 rounded mx-auto" />
+    ) : (
+      <div className="text-3xl font-bold text-blue-600">
+        {deviceTypeStats.mobile.active}/{deviceTypeStats.mobile.total}
+      </div>
+    )}
+  </div>
+
+  {/* STATIONARY */}
+  <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-5 text-center">
+    <div className="text-gray-500 mb-2">Stationary Devices</div>
+
+    {isStatsLoading ? (
+      <div className="animate-pulse h-8 w-20 bg-gray-300 rounded mx-auto" />
+    ) : (
+      <div className="text-3xl font-bold text-orange-500">
+        {deviceTypeStats.stationary.active}/{deviceTypeStats.stationary.total}
+      </div>
+    )}
+  </div>
+
 </div>
 
 
