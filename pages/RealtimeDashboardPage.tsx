@@ -94,7 +94,7 @@ const filteredDevices = useMemo(() => {
 //     inactive,
 //   };
 // }, [devices, selectedDevices]);
-const ACTIVE_THRESHOLD = 60 * 1000; // 60 seconds
+const ACTIVE_THRESHOLD = 60 * 1000; 
 
 const deviceStats = useMemo(() => {
   const total = selectedDevices.length;
@@ -384,9 +384,9 @@ const chartData = useMemo(() => {
   closeMenuOnSelect={false}
   hideSelectedOptions={false}
   options={groupDevices.map((d: any) => ({
-  label: d.id,
-  value: d.id,
-}))}
+    label: d.id,
+    value: d.id,
+  }))}
   value={selectedDevices.map((id) => ({
     label: id,
     value: id,
@@ -397,40 +397,39 @@ const chartData = useMemo(() => {
     )
   }
   placeholder="Select Devices"
-  className="w-full min-w-[400px]"
+  className="w-64" // ✅ same width as Select Group
   styles={{
     control: (base) => ({
       ...base,
       backgroundColor: "#e5e7eb",
       border: "1px solid #d1d5db",
       borderRadius: "12px",
-      minHeight: "120px", // tall box
-      alignItems: "flex-start",
+      minHeight: "38px", // ✅ normal height
+      alignItems: "center", // ✅ center like normal dropdown
       boxShadow: "none",
     }),
 
     valueContainer: (base) => ({
       ...base,
-      padding: "12px",
-      gap: "10px",
+      padding: "4px 8px", // ✅ reduced padding
+      gap: "6px",
       flexWrap: "wrap",
-      maxHeight: "120px",
-      overflowY: "auto", // internal scroll
-      alignContent: "flex-start",
+      maxHeight: "80px", // optional small scroll area
+      overflowY: "auto",
     }),
 
     multiValue: (base) => ({
       ...base,
       backgroundColor: "#dbeafe",
       borderRadius: "9999px",
-      padding: "4px 12px",
+      padding: "2px 8px", // ✅ smaller chips
     }),
 
     multiValueLabel: (base) => ({
       ...base,
       color: "#2563eb",
       fontWeight: 600,
-      fontSize: "14px",
+      fontSize: "12px",
       padding: 0,
     }),
 
@@ -452,6 +451,7 @@ const chartData = useMemo(() => {
       zIndex: 9999,
     }),
   }}
+
 />
 <div className="relative">
   <button
