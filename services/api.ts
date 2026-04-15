@@ -12,6 +12,7 @@ export const Endpoint = {
   GROUP_DEVICES: "https://bw04.kaatru.org/group",
   ACCESS_MANAGEMENT: "https://caas.kaatru.org/admin/access-management",
   ACCESS_MANAGEMENT_SYNC: "https://caas.kaatru.org/admin/access-management/sync",
+  DATA_DOWNLOAD: "http://bw02.kaatru.org/job/data/download",
 
   // ✅ NEW
   SENSOR_HISTORY: "https://bw06.kaatru.org/stale/filter",
@@ -63,6 +64,12 @@ abstract class ApiService {
   ): void;
 
   abstract disconnectAllWebSockets(): void;
+  abstract downloadData(payload: {
+  startTime: string;
+  endTime: string;
+  device: string;
+  email: string;
+}): Promise<any>;
 }
 
 /* ------------------------------------------------------------
@@ -237,6 +244,33 @@ async isLoggedIn() {
     Object.values(this.#wsChannels).forEach((ws) => ws.close());
     this.#wsChannels = {};
   }
+ async downloadData(payload: {
+  startTime: string;
+  endTime: string;
+  device: string;
+  email: string;
+}) {
+  const url = this.#buildUrl(Endpoint.DATA_DOWNLOAD);
+
+  // ✅ Convert to timestamps
+  const st = new Date(payload.startTime).getTime();
+  const et = new Date(payload.endTime).getTime();
+
+  const res = await axios.post(
+    url,
+    {
+      st,
+      et,
+      cols: payload.device, // 🔥 IMPORTANT rename
+      email: payload.email,
+    },
+    {
+      headers: this.#getHeaders(),
+    }
+  );
+
+  return res.data;
+}
 }
 
 /* ------------------------------------------------------------
@@ -280,6 +314,9 @@ class Mock extends ApiService {
   }
   async fetchDevices() {
   return [];
+}
+async downloadData() {
+  return { message: "Mock download success" };
 }
 
   connectDeviceWebSocket() {}

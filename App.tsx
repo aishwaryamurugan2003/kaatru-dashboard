@@ -9,6 +9,7 @@ import DeviceAdministrationPage from "./pages/DeviceAdministrationPage";
 // import DataVisualizationPage from "./pages/DataVisualizationPage";
 import RealtimeDashboardPage from "./pages/RealtimeDashboardPage";
 import ChartCustomizationPage from "./pages/ChartCustomizationPage"; // ✅ NEW
+import DataDownloader from "./pages/DataDownloaderPage"; // adjust path
 
 import { isTokenAlive } from "./utils/token";
 import { apiService } from "./services/api";
@@ -64,6 +65,17 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route
+  path="/data-downloader"
+  element={
+    <ProtectedRoute>
+      <DashboardLayout>
+        <DataDownloader />
+      </DashboardLayout>
+    </ProtectedRoute>
+  }
+/>
 
         <Route
           path="/device-admin"
