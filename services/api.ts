@@ -12,7 +12,7 @@ export const Endpoint = {
   GROUP_DEVICES: "https://bw04.kaatru.org/group",
   ACCESS_MANAGEMENT: "https://caas.kaatru.org/admin/access-management",
   ACCESS_MANAGEMENT_SYNC: "https://caas.kaatru.org/admin/access-management/sync",
-  DATA_DOWNLOAD: "https://bw02.kaatru.org/job/data/download",
+  DATA_DOWNLOAD: "http://bw02.kaatru.org/job/data/download",
 
   // ✅ NEW
   SENSOR_HISTORY: "https://bw06.kaatru.org/stale/filter",
