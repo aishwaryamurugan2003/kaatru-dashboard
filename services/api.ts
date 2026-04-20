@@ -16,6 +16,13 @@ export const Endpoint = {
 
   // ✅ NEW
   SENSOR_HISTORY: "https://bw06.kaatru.org/stale/filter",
+
+  // ✅ OTA ENDPOINTS
+  OTA_UPLOAD_FIRMWARE: "/user/upload",
+  OTA_USER_RUNNING_VERSION: "/user/running-version",
+  OTA_DEVICE_RUNNING_VERSION: "/device/running-version",
+  OTA_DEVICE_FIRMWARE_FILE: "/device/file",
+  OTA_DEVICE_UPDATE_AFTER: "/device/update-running-version-after-ota",
 } as const;
 
 /* ------------------------------------------------------------
@@ -54,6 +61,13 @@ abstract class ApiService {
     deviceId: string,
     filter: string
   ): Promise<any>;
+
+  // ✅ OTA METHODS
+  abstract uploadFirmware(deviceId: string, deviceGroup: string, file: File): Promise<any>;
+  abstract setRunningVersion(deviceId: string, versionNumber: string): Promise<any>;
+  abstract getRunningVersion(deviceId: string): Promise<any>;
+  abstract getFirmwareFile(deviceId: string, version: string): Promise<any>;
+  abstract updateRunningVersionAfterOTA(deviceId: string): Promise<any>;
 
   abstract fetchDevices(): Promise<any[]>;
 
@@ -166,6 +180,57 @@ async isLoggedIn() {
       headers: this.#getHeaders(),
     });
 
+    return res.data;
+  }
+
+  /* ------------------------------------------------------------
+     ✅ OTA API
+  ------------------------------------------------------------ */
+  async uploadFirmware(deviceId: string, deviceGroup: string, file: File) {
+    const url = this.#buildUrl(`${Endpoint.OTA_UPLOAD_FIRMWARE}/${deviceId}`);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await axios.post(url, formData, {
+      params: { device_group: deviceGroup },
+      headers: {
+        ...this.#getHeaders(),
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return res.data;
+  }
+
+  async setRunningVersion(deviceId: string, versionNumber: string) {
+    const url = this.#buildUrl(`${Endpoint.OTA_USER_RUNNING_VERSION}/${deviceId}`);
+    const res = await axios.post(url, null, {
+      params: { version_number: versionNumber },
+      headers: this.#getHeaders(),
+    });
+    return res.data;
+  }
+
+  async getRunningVersion(deviceId: string) {
+    const url = this.#buildUrl(`${Endpoint.OTA_DEVICE_RUNNING_VERSION}/${deviceId}`);
+    const res = await axios.get(url, { headers: this.#getHeaders() });
+    return res.data;
+  }
+
+  async getFirmwareFile(deviceId: string, version: string) {
+    const url = this.#buildUrl(`${Endpoint.OTA_DEVICE_FIRMWARE_FILE}/${deviceId}/${version}`);
+    const res = await axios.get(url, { 
+      headers: this.#getHeaders(),
+      responseType: "blob" 
+    });
+    return res.data;
+  }
+
+  async updateRunningVersionAfterOTA(deviceId: string) {
+    const url = this.#buildUrl(Endpoint.OTA_DEVICE_UPDATE_AFTER);
+    const res = await axios.post(url, null, {
+      params: { device_id: deviceId },
+      headers: this.#getHeaders(),
+    });
     return res.data;
   }
 
@@ -305,6 +370,12 @@ class Mock extends ApiService {
   async fetchSensorHistory() {
     return {};
   }
+
+  async uploadFirmware() { return {}; }
+  async setRunningVersion() { return {}; }
+  async getRunningVersion() { return { running_version: "1.0.0" }; }
+  async getFirmwareFile() { return new Blob(["mock firmware"]); }
+  async updateRunningVersionAfterOTA() { return {}; }
 
   async getUserFullAccess() {
     return [];

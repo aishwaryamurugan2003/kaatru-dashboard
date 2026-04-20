@@ -10,6 +10,7 @@ import DeviceAdministrationPage from "./pages/DeviceAdministrationPage";
 import RealtimeDashboardPage from "./pages/RealtimeDashboardPage";
 import ChartCustomizationPage from "./pages/ChartCustomizationPage"; // ✅ NEW
 import DataDownloader from "./pages/DataDownloaderPage"; // adjust path
+import OTAPage from "./pages/OTAPage";
 
 import { isTokenAlive } from "./utils/token";
 import { apiService } from "./services/api";
@@ -106,6 +107,18 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <ChartCustomizationPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ---------- NEW OTA UPDATE PAGE ---------- */}
+        <Route
+          path="/ota"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <OTAPage />
               </DashboardLayout>
             </ProtectedRoute>
           }

@@ -14,7 +14,6 @@ const DeviceAdministrationPage: React.FC = () => {
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(true);
 
-
 const fetchUsers = async () => {
   try {
     setLoading(true);
