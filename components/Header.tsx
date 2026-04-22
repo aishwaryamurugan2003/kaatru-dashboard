@@ -39,24 +39,35 @@ const Header: React.FC<HeaderProps> = ({ setSidebarOpen }) => {
           
           {/* Left: Hamburger & Title */}
           <div className="flex items-center gap-4">
-            <button
-              className="text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300 lg:hidden"
-              aria-controls="sidebar"
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                setSidebarOpen(true); 
-              }}
-            >
-              <span className="sr-only">Open sidebar</span>
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
 
-            <h1 className="text-lg font-semibold text-gray-800 dark:text-white hidden sm:block">
-              Data Analysis Dashboard
-            </h1>
-          </div>
+  {/* Logo */}
+  <img
+  src="/animations/logo.jpeg"
+  alt="Elicius Energy"
+  className="h-10 w-auto object-contain"
+/>
+
+  {/* Hamburger */}
+  <button
+    className="text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300 lg:hidden"
+    aria-controls="sidebar"
+    onClick={(e) => { 
+      e.stopPropagation(); 
+      setSidebarOpen(true); 
+    }}
+  >
+    <span className="sr-only">Open sidebar</span>
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  </button>
+
+  {/* Title */}
+  <h1 className="text-lg font-semibold text-gray-800 dark:text-white hidden sm:block">
+    Data Analysis Dashboard
+  </h1>
+
+</div>
 
           {/* Right: Profile Dropdown */}
           <div className="flex items-center">

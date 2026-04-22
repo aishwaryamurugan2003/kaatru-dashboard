@@ -50,70 +50,71 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     >
       {/* HEADER */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 h-16">
-        <div
-          className={`flex items-center gap-3 overflow-hidden whitespace-nowrap transition-all duration-300 ${
-            isOpen ? "opacity-100 w-auto" : "opacity-0 w-0"
-          }`}
-        >
-          <div className="h-8 w-8 flex-shrink-0 bg-indigo-600 rounded-lg flex items-center justify-center shadow-md">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 text-white"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-              />
-            </svg>
-          </div>
-          <h1 className="text-xl font-bold text-gray-800 dark:text-white tracking-tight">
-            BrandLogo
-          </h1>
-        </div>
+  
+  {/* 🔥 FIXED LOGO SECTION */}
 
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hidden lg:block focus:outline-none transition-colors"
-        >
-          {isOpen ? (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-          ) : (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
-          )}
-        </button>
-      </div>
+  <div
+  className={`flex items-center gap-3 transition-all duration-300 ${
+    isOpen ? "justify-start" : "justify-center w-full"
+  }`}
+>
+  <div className="bg-white rounded-md p-2 shadow-sm flex items-center justify-center">
+    <img
+      src="/animations/logo.jpeg"
+      alt="Elicius Energy"
+      className={`object-contain flex-shrink-0 ${
+        isOpen ? "h-12" : "h-10"
+      }`}
+    />
+  </div>
 
+  {isOpen && (
+    <h1 className="text-lg font-bold text-gray-800 dark:text-white whitespace-nowrap">
+      Elicius Energy
+    </h1>
+  )}
+</div>
+
+  {/* Toggle Button */}
+  <button
+    onClick={() => setIsOpen(!isOpen)}
+    className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hidden lg:block focus:outline-none transition-colors"
+  >
+    {isOpen ? (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-5 w-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M15 19l-7-7 7-7"
+        />
+      </svg>
+    ) : (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-5 w-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 5l7 7-7 7"
+        />
+      </svg>
+    )}
+  </button>
+
+</div>
+    
       {/* NAVIGATION */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto">
         <ul className="space-y-1">
