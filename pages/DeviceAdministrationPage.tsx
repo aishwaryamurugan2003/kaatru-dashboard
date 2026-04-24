@@ -50,13 +50,31 @@ const columns = [
   { title: "S.No", dataIndex: "sno", width: 80 },
 
   {
-    title: "Username",
+    title: "User",
     dataIndex: "username",
-    render: (text: string) => (
-  <span className="font-sans text-sm font-medium text-gray-800">
-    {text}
-  </span>
-),
+    render: (text: string, record: any) => {
+      const initial = text ? text.charAt(0).toUpperCase() : "";
+      
+      // Simple hash to generated consistent avatar color
+      let hash = 0;
+      for (let i = 0; i < (text || "").length; i++) hash = text.charCodeAt(i) + ((hash << 5) - hash);
+      const colors = ["bg-blue-100 text-blue-700", "bg-purple-100 text-purple-700", "bg-pink-100 text-pink-700", "bg-green-100 text-green-700", "bg-yellow-100 text-yellow-700", "bg-red-100 text-red-700"];
+      const colorClass = colors[Math.abs(hash) % colors.length];
+
+      return (
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${colorClass}`}>
+            {initial}
+          </div>
+          <div className="flex flex-col">
+            <span className="font-sans text-sm font-semibold text-gray-900 capitalize">
+              {text}
+            </span>
+            <span className="text-xs text-gray-500">@{text.toLowerCase()}</span>
+          </div>
+        </div>
+      );
+    },
   },
 
   {
@@ -96,18 +114,34 @@ const columns = [
 ];
 
 
-  const GroupChips = ({ access }) => {
-    if (!access || access.length === 0) return "—";
+  const GroupChips = ({ access }: { access: any[] }) => {
+    if (!access || access.length === 0) return <>—</>;
 
     const firstThree = access.slice(0, 3);
     const remaining = access.slice(3);
+
+    const getBadgeStyle = (name: string) => {
+      const colors = [
+        "bg-purple-50 text-purple-700 border border-purple-200",
+        "bg-blue-50 text-blue-700 border border-blue-200",
+        "bg-indigo-50 text-indigo-700 border border-indigo-200",
+        "bg-pink-50 text-pink-700 border border-pink-200",
+        "bg-green-50 text-green-700 border border-green-200",
+        "bg-orange-50 text-orange-700 border border-orange-200",
+      ];
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      return colors[Math.abs(hash) % colors.length];
+    };
 
     return (
       <div className="flex flex-wrap gap-2 items-center">
         {firstThree.map((g) => (
           <span
             key={g.group_id}
-            className="px-3 py-1 rounded-md text-sm font-medium bg-purple-100 text-purple-700"
+            className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${getBadgeStyle(g.group_name)}`}
           >
             {g.group_name}
           </span>
@@ -115,10 +149,14 @@ const columns = [
 
         {remaining.length > 0 && (
           <Tooltip
+            color="white"
+            overlayInnerStyle={{ padding: '8px', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
             title={
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-wrap gap-1.5 max-w-[200px]">
                 {remaining.map((g) => (
-                  <span key={g.group_id}>{g.group_name}</span>
+                  <span key={g.group_id} className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${getBadgeStyle(g.group_name)}`}>
+                    {g.group_name}
+                  </span>
                 ))}
               </div>
             }

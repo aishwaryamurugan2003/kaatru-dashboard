@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface HeaderProps {
   setSidebarOpen: (open: boolean) => void;
@@ -9,6 +9,19 @@ const Header: React.FC<HeaderProps> = ({ setSidebarOpen }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const getPageTitle = (path: string) => {
+    if (path.includes('device-admin')) return 'Device Administration';
+    if (path.includes('data-downloader')) return 'Data Downloader';
+    if (path.includes('chart-customization')) return 'Chart Customization';
+    if (path.includes('realtime-dashboard')) return 'Realtime Dashboard';
+    if (path.includes('ota')) return 'OTA Update';
+    if (path.includes('dashboard')) return 'Data Analysis';
+    return 'Dashboard';
+  };
+
+  const title = getPageTitle(location.pathname);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -64,7 +77,7 @@ const Header: React.FC<HeaderProps> = ({ setSidebarOpen }) => {
 
   {/* Title */}
   <h1 className="text-lg font-semibold text-gray-800 dark:text-white hidden sm:block">
-    Data Analysis Dashboard
+    {title}
   </h1>
 
 </div>
