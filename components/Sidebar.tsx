@@ -121,7 +121,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
           <NavItem
             to="/dashboard"
             isExpanded={isOpen}
-            label="Home"
+            label="Dashboard Explorer"
             icon={
               <svg
                 className="h-6 w-6"
@@ -140,7 +140,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
           />
 
           <NavItem
-            to="/dashboard"
+            to="/data-analysis"
             isExpanded={isOpen}
             label="Data Analysis"
             icon={

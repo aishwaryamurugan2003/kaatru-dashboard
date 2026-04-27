@@ -303,13 +303,14 @@ const chartData = useMemo(() => {
       const res = await apiService.get("/device", { id });
 
       const d = res.data.device?.[0];
+      const typeStr = d?.deviceType || d?.device_type || d?.type;
 
       return {
         id,
-        type: d?.device_type?.toLowerCase() || "stationary",
+        type: typeStr ? typeStr.toLowerCase() : (id.toUpperCase().startsWith("M") ? "mobile" : "stationary"),
       };
     } catch {
-      return { id, type: "stationary" };
+      return { id, type: id.toUpperCase().startsWith("M") ? "mobile" : "stationary" };
     }
   })
 );
@@ -359,7 +360,7 @@ const chartData = useMemo(() => {
     <div className="p-6 space-y-4 bg-gray-50 dark:bg-gray-900">
 
       {/* TOP FILTER BAR */}
-      <div className="flex items-center gap-4 bg-white dark:bg-gray-800 p-3 rounded-xl shadow relative">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 bg-white dark:bg-gray-800 p-3 rounded-xl shadow relative">
 <Select
   options={groups.map((g: any) => ({
     label: g.name,
@@ -377,7 +378,7 @@ const chartData = useMemo(() => {
     setSelectedGroup((opt as Option)?.value || "")
   }
   placeholder="Select Group"
-  className="w-64"
+  className="w-full md:w-64"
 />
 <Select
   isMulti
@@ -397,32 +398,30 @@ const chartData = useMemo(() => {
     )
   }
   placeholder="Select Devices"
-  className="w-64" // ✅ same width as Select Group
+  className="w-full md:w-64" // ✅ same width as Select Group
   styles={{
     control: (base) => ({
       ...base,
-      backgroundColor: "#e5e7eb",
-      border: "1px solid #d1d5db",
-      borderRadius: "12px",
-      minHeight: "38px", // ✅ normal height
-      alignItems: "center", // ✅ center like normal dropdown
+      minHeight: "38px",
+      maxHeight: "38px",
+      alignItems: "center",
       boxShadow: "none",
     }),
 
     valueContainer: (base) => ({
       ...base,
-      padding: "4px 8px", // ✅ reduced padding
-      gap: "6px",
-      flexWrap: "wrap",
-      maxHeight: "80px", // optional small scroll area
-      overflowY: "auto",
+      padding: "2px 8px",
+      gap: "4px",
+      flexWrap: "nowrap",
+      overflowX: "auto",
+      scrollbarWidth: "none",
     }),
 
     multiValue: (base) => ({
       ...base,
       backgroundColor: "#dbeafe",
-      borderRadius: "9999px",
-      padding: "2px 8px", // ✅ smaller chips
+      borderRadius: "4px",
+      flexShrink: 0,
     }),
 
     multiValueLabel: (base) => ({
@@ -430,7 +429,7 @@ const chartData = useMemo(() => {
       color: "#2563eb",
       fontWeight: 600,
       fontSize: "12px",
-      padding: 0,
+      padding: "2px",
     }),
 
     multiValueRemove: (base) => ({
@@ -453,9 +452,9 @@ const chartData = useMemo(() => {
   }}
 
 />
-<div className="relative">
+<div className="relative flex justify-end w-full md:w-auto">
   <button
-    className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+    className="bg-blue-600 text-white px-4 py-2 rounded-lg w-full md:w-auto"
     onClick={() => setShowAddMenu(!showAddMenu)}
   >
     Add
@@ -478,7 +477,7 @@ const chartData = useMemo(() => {
 </div>
 
 {/* STATUS CARDS */}
-<div className="grid grid-cols-3 gap-4">
+<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
   <StatusCard
     label="Total Devices"
     value={deviceStats.total}
@@ -499,7 +498,7 @@ const chartData = useMemo(() => {
 </div>
 
 {/* DEVICE TYPE CARDS */}
-<div className="grid grid-cols-2 gap-4">
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
   {/* MOBILE */}
   <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-5 text-center">
@@ -533,7 +532,7 @@ const chartData = useMemo(() => {
 
 
       {/* MAIN GRID */}
-      <div className="grid grid-cols-[3fr_2fr] gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-[3fr_2fr] gap-4">
 
         {/* LIVE MAP */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
@@ -563,8 +562,8 @@ const chartData = useMemo(() => {
           AGGREGATE
         </h2>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white rounded-xl shadow p-8 flex items-center justify-center text-center">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white rounded-xl shadow p-6 md:p-8 flex items-center justify-center text-center">
             <div>
               <div className="text-gray-500 text-xl">PM 2.5</div>
               <div className="text-5xl font-bold">
@@ -589,7 +588,7 @@ const chartData = useMemo(() => {
           {focusedDeviceId || "Device"}
         </h2>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="grid grid-cols-2 gap-4">
             <SensorCard label="PM 1" value={focusedDevice?.sPM2 ?? "--"} unit="µg/m³" />
             <SensorCard label="PM 10" value={focusedDevice?.sPM10 ?? "--"} unit="µg/m³" />

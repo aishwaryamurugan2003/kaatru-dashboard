@@ -9,6 +9,8 @@ import DeviceAdministrationPage from "./pages/DeviceAdministrationPage";
 // import DataVisualizationPage from "./pages/DataVisualizationPage";
 import RealtimeDashboardPage from "./pages/RealtimeDashboardPage";
 import ChartCustomizationPage from "./pages/ChartCustomizationPage"; // ✅ NEW
+import DashboardExplorerPage from "./pages/DashboardExplorerPage"; // ✅ NEW
+import GroupDashboardPage from "./pages/GroupDashboardPage"; // ✅ NEW
 import DataDownloader from "./pages/DataDownloaderPage"; // adjust path
 import OTAPage from "./pages/OTAPage";
 
@@ -58,6 +60,43 @@ function App() {
         {/* ---------- PROTECTED DASHBOARD ROUTES ---------- */}
         <Route
           path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <DashboardExplorerPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/:groupId"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <GroupDashboardPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Catch-all dynamic dashboard view placeholder for future */}
+        <Route
+          path="/dashboard/:groupId/:dashboardType"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen text-gray-800 dark:text-gray-200">
+                  <h1 className="text-2xl font-bold">Dynamic Dashboard View</h1>
+                  <p className="mt-4">This route is prepared for displaying dynamic views per group/dashboard.</p>
+                </div>
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/data-analysis"
           element={
             <ProtectedRoute>
               <DashboardLayout>
