@@ -19,18 +19,16 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, to, isExpanded }) => (
       to={to}
       className={({ isActive }) =>
         `flex items-center p-3 my-1 rounded-lg transition-colors duration-200 
-        ${
-          isActive
-            ? "bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-200"
-            : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+        ${isActive
+          ? "bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-200"
+          : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
         }`
       }
     >
       {icon}
       <span
-        className={`ml-4 font-medium transition-opacity duration-200 ${
-          isExpanded ? "opacity-100" : "opacity-0"
-        }`}
+        className={`ml-4 font-medium transition-opacity duration-200 ${isExpanded ? "opacity-100" : "opacity-0"
+          }`}
       >
         {label}
       </span>
@@ -50,94 +48,73 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     >
       {/* HEADER */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 h-16">
-  
-  {/* 🔥 FIXED LOGO SECTION */}
 
-  <div
-  className={`flex items-center gap-3 transition-all duration-300 ${
-    isOpen ? "justify-start" : "justify-center w-full"
-  }`}
->
-  <div className="bg-white rounded-md p-2 shadow-sm flex items-center justify-center">
-    <img
-      src="/animations/logo.jpeg"
-      alt="Elicius Energy"
-      className={`object-contain flex-shrink-0 ${
-        isOpen ? "h-12" : "h-10"
-      }`}
-    />
-  </div>
+        {/* 🔥 FIXED LOGO SECTION */}
 
-  {isOpen && (
-    <h1 className="text-lg font-bold text-gray-800 dark:text-white whitespace-nowrap">
-      Elicius Energy
-    </h1>
-  )}
-</div>
+        <div
+          className={`flex items-center gap-3 transition-all duration-300 ${isOpen ? "justify-start" : "justify-center w-full"
+            }`}
+        >
+          <div className="bg-white rounded-md p-2 shadow-sm flex items-center justify-center">
+            <img
+              src="/animations/logo.jpeg"
+              alt="Elicius Energy"
+              className={`object-contain flex-shrink-0 ${isOpen ? "h-12" : "h-10"
+                }`}
+            />
+          </div>
 
-  {/* Toggle Button */}
-  <button
-    onClick={() => setIsOpen(!isOpen)}
-    className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hidden lg:block focus:outline-none transition-colors"
-  >
-    {isOpen ? (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className="h-5 w-5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M15 19l-7-7 7-7"
-        />
-      </svg>
-    ) : (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className="h-5 w-5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M9 5l7 7-7 7"
-        />
-      </svg>
-    )}
-  </button>
+          {isOpen && (
+            <h1 className="text-lg font-bold text-gray-800 dark:text-white whitespace-nowrap">
+              Elicius Energy
+            </h1>
+          )}
+        </div>
 
-</div>
-    
+        {/* Toggle Button */}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hidden lg:block focus:outline-none transition-colors"
+        >
+          {isOpen ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          )}
+        </button>
+
+      </div>
+
       {/* NAVIGATION */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto">
         <ul className="space-y-1">
-          <NavItem
-            to="/dashboard"
-            isExpanded={isOpen}
-            label="Dashboard Explorer"
-            icon={
-              <svg
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                />
-              </svg>
-            }
-          />
+
 
           <NavItem
             to="/data-analysis"
@@ -207,51 +184,71 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     </svg>
   }
 /> */}
-<NavItem
-  to="/realtime-dashboard"
-  isExpanded={isOpen}
-  label="Realtime Dashboard"
-  icon={
-    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M3 3v18h18M9 17v-6m4 6V7m4 10v-4"
-      />
-    </svg>
-  }
-/>
-<NavItem
-  to="/chart-customization"
-  isExpanded={isOpen}
-  label="Chart Customization"
-  icon={
-    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M4 19V5m6 14V9m6 10V3"
-      />
-    </svg>
-  }
-/>
-<NavItem
-  to="/ota"
-  isExpanded={isOpen}
-  label="OTA Update"
-  icon={
-    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-      />
-    </svg>
-  }
-/>
+          <NavItem
+            to="/realtime-dashboard"
+            isExpanded={isOpen}
+            label="Realtime Dashboard"
+            icon={
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 3v18h18M9 17v-6m4 6V7m4 10v-4"
+                />
+              </svg>
+            }
+          />
+          <NavItem
+            to="/chart-customization"
+            isExpanded={isOpen}
+            label="Chart Customization"
+            icon={
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 19V5m6 14V9m6 10V3"
+                />
+              </svg>
+            }
+          />
+          <NavItem
+            to="/ota"
+            isExpanded={isOpen}
+            label="OTA Update"
+            icon={
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                />
+              </svg>
+            }
+          />
+          <NavItem
+            to="/dashboard"
+            isExpanded={isOpen}
+            label="Dashboard Explorer"
+            icon={
+              <svg
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                />
+              </svg>
+            }
+          />
 
 
         </ul>
