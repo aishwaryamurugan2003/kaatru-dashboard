@@ -46,7 +46,7 @@ export function RenderChart({
 
   // Legend isolation state
   const [isolatedDevice, setIsolatedDevice] = useState<string | null>(null);
-  
+
   const handleLegendClick = (e: any) => {
     const clickedItem = e.value;
     setIsolatedDevice((prev) => (prev === clickedItem ? null : clickedItem));
@@ -77,38 +77,70 @@ export function RenderChart({
     setZoomLeft("dataMin");
     setZoomRight("dataMax");
   };
-
   useEffect(() => {
     async function load() {
       if (!yKey || yKey === "device" || devices.length === 0) return;
+
       setLoading(true);
+
       try {
         const allData: any[] = [];
-        
-        // STRICT SEQUENTIAL FETCH
-        // We CANNOT use Promise.all here because querying 10+ devices concurrently 
-        // DDOSes the backend, causing 504 Gateway Timeouts for all of them.
+
         for (const d of devices) {
           try {
-            const api = await apiService.fetchSensorHistory(d.value, "15M");
+            const deviceId = d.value.toUpperCase();
+
+            // ✅ Decide endpoint based on device type
+            const useStale =
+              deviceId.startsWith("SG") ||
+              deviceId.startsWith("MG") ||
+              deviceId.startsWith("LMG");
+
+            let api;
+
+            if (useStale) {
+              // ✅ Gurugram devices
+              api = await apiService.get(
+                `https://bw06.kaatru.org/stale/filter`,
+                {
+                  devices: d.value,
+                  filter: "15M",
+                }
+              );
+
+              // IMPORTANT: normalize structure
+              api = api.data;
+            } else {
+              // ✅ Normal devices (SIN etc.)
+              api = await apiService.fetchSensorHistory(d.value, "15M");
+            }
+
+            // ✅ Convert to chart format
             const result = convertHistoryToTimeSeries(api, yKey);
+
             const withDevice = result.map((r: any) => ({
               ...r,
               device: d.value,
             }));
+
             allData.push(...withDevice);
           } catch (deviceError) {
-            console.warn(`Device ${d.value} skipped: returned an error.`, deviceError);
+            console.warn(`Device ${d.value} skipped`, deviceError);
           }
         }
-        
-        allData.sort((a, b) => a.srvtime - b.srvtime); // VERY IMPORTANT FOR RECHARTS
+
+        allData.sort((a, b) => a.srvtime - b.srvtime);
+
+        console.log("FINAL CHART DATA:", allData);
+
         setData(allData);
       } catch (e) {
         console.error("CRITICAL API ERROR", e);
       }
+
       setLoading(false);
     }
+
     load();
   }, [yKey, devices]);
 
@@ -149,7 +181,7 @@ export function RenderChart({
       <ResponsiveContainer width="100%" height={300}>
         <>
           {type === "line" && (
-            <AreaChart 
+            <AreaChart
               data={data}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
@@ -158,8 +190,8 @@ export function RenderChart({
               <defs>
                 {devices.map((d, index) => (
                   <linearGradient key={d.value} id={`color${d.value}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0}/>
+                    <stop offset="5%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0} />
                   </linearGradient>
                 ))}
               </defs>
@@ -175,10 +207,10 @@ export function RenderChart({
                 axisLine={{ stroke: '#e5e7eb' }}
                 tickLine={{ stroke: '#e5e7eb' }}
               />
-              <YAxis 
+              <YAxis
                 domain={['auto', 'auto']}
                 tickCount={6}
-                tickFormatter={(val) => Math.round(val).toString()} 
+                tickFormatter={(val) => Math.round(val).toString()}
                 tick={{ fill: '#6b7280', fontSize: 12 }}
                 tickMargin={10}
                 axisLine={{ stroke: '#e5e7eb' }}
@@ -212,11 +244,11 @@ export function RenderChart({
 
           {/* ---------------- BAR CHART ---------------- */}
           {type === "bar" && (
-            <BarChart 
-               data={data}
-               onMouseDown={handleMouseDown}
-               onMouseMove={handleMouseMove}
-               onMouseUp={handleMouseUp}
+            <BarChart
+              data={data}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
               <XAxis
@@ -228,10 +260,10 @@ export function RenderChart({
                 tick={{ fill: '#6b7280', fontSize: 12 }}
                 axisLine={{ stroke: '#e5e7eb' }}
               />
-              <YAxis 
-                domain={['auto', 'auto']} 
-                tickCount={6} 
-                tick={{ fill: '#6b7280', fontSize: 12 }} 
+              <YAxis
+                domain={['auto', 'auto']}
+                tickCount={6}
+                tick={{ fill: '#6b7280', fontSize: 12 }}
                 axisLine={{ stroke: '#e5e7eb' }}
               />
               <Tooltip
@@ -241,11 +273,11 @@ export function RenderChart({
               />
               <Legend wrapperStyle={{ cursor: 'pointer' }} onClick={handleLegendClick} />
               {devices.length > 0 ? devices.map((d, index) => (
-                <Bar 
+                <Bar
                   hide={isolatedDevice !== null && isolatedDevice !== d.label}
-                  key={d.value} 
-                  dataKey={(entry) => entry.device === d.value ? entry[yKey] : null} 
-                  fill={COLORS[index % COLORS.length]} 
+                  key={d.value}
+                  dataKey={(entry) => entry.device === d.value ? entry[yKey] : null}
+                  fill={COLORS[index % COLORS.length]}
                   name={d.label}
                   radius={[4, 4, 0, 0]}
                 />
@@ -289,9 +321,9 @@ export function RenderChart({
           {/* ---------------- SCATTER ---------------- */}
           {type === "scatter" && (
             <ScatterChart
-               onMouseDown={handleMouseDown}
-               onMouseMove={handleMouseMove}
-               onMouseUp={handleMouseUp}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
               <XAxis
@@ -302,11 +334,11 @@ export function RenderChart({
                 tickFormatter={(value) => formatTime(value)}
                 tick={{ fill: '#6b7280', fontSize: 12 }}
               />
-              <YAxis 
-                dataKey={(entry) => entry[yKey] || 0} 
-                domain={['auto', 'auto']} 
-                tickCount={6} 
-                tick={{ fill: '#6b7280', fontSize: 12 }} 
+              <YAxis
+                dataKey={(entry) => entry[yKey] || 0}
+                domain={['auto', 'auto']}
+                tickCount={6}
+                tick={{ fill: '#6b7280', fontSize: 12 }}
               />
               <Tooltip
                 labelFormatter={(value) => formatTime(value)}
@@ -316,15 +348,15 @@ export function RenderChart({
               />
               <Legend wrapperStyle={{ cursor: 'pointer' }} onClick={handleLegendClick} />
               {devices.length > 0 ? devices.map((d, index) => (
-                 <Scatter 
-                   hide={isolatedDevice !== null && isolatedDevice !== d.label}
-                   key={d.value} 
-                   name={d.label} 
-                   data={data.filter(entry => entry.device === d.value)} 
-                   fill={COLORS[index % COLORS.length]} 
-                 />
+                <Scatter
+                  hide={isolatedDevice !== null && isolatedDevice !== d.label}
+                  key={d.value}
+                  name={d.label}
+                  data={data.filter(entry => entry.device === d.value)}
+                  fill={COLORS[index % COLORS.length]}
+                />
               )) : (
-                 <Scatter data={data} fill="#f59e0b" />
+                <Scatter data={data} fill="#f59e0b" />
               )}
               {refAreaLeft && refAreaRight ? (
                 <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#3b82f6" fillOpacity={0.1} />
@@ -334,7 +366,7 @@ export function RenderChart({
 
           {/* ---------------- COMPOSED ---------------- */}
           {type === "composed" && (
-            <ComposedChart 
+            <ComposedChart
               data={data}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
@@ -349,10 +381,10 @@ export function RenderChart({
                 tickFormatter={(value) => formatTime(value)}
                 tick={{ fill: '#6b7280', fontSize: 12 }}
               />
-              <YAxis 
-                domain={['auto', 'auto']} 
-                tickCount={6} 
-                tick={{ fill: '#6b7280', fontSize: 12 }} 
+              <YAxis
+                domain={['auto', 'auto']}
+                tickCount={6}
+                tick={{ fill: '#6b7280', fontSize: 12 }}
               />
               <Tooltip
                 labelFormatter={(value) => formatTime(value)}
