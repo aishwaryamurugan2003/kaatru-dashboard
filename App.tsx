@@ -17,6 +17,8 @@ import OTAPage from "./pages/OTAPage";
 import { isTokenAlive } from "./utils/token";
 import { apiService } from "./services/api";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import DashboardRealtimeDebugPage from "./pages/DashboardRealtimeDebug";
+import GroupRealtimeDetail from "./pages/GroupRealtimeDetail";
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -70,6 +72,28 @@ function App() {
         />
 
         <Route
+          path="/realtime/health"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <DashboardRealtimeDebugPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/realtime/health/:groupId"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <GroupRealtimeDetail />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/dashboard/:groupId"
           element={
             <ProtectedRoute>
@@ -107,15 +131,15 @@ function App() {
         />
 
         <Route
-  path="/data-downloader"
-  element={
-    <ProtectedRoute>
-      <DashboardLayout>
-        <DataDownloader />
-      </DashboardLayout>
-    </ProtectedRoute>
-  }
-/>
+          path="/data-downloader"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <DataDownloader />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/device-admin"
