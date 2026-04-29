@@ -3,8 +3,9 @@ import TimeSeriesChart from "../components/TimeSeriesChart";
 import HeatMapLeaflet from "../components/HeatMapLeaflet";
 import DeviceSelector from "../components/DeviceSelector";
 import { apiService, Endpoint } from "../services/api";
+import axios from "axios";
 
-const ALL_DEVICES = ["MG53"];
+const ALL_DEVICES = ["MG53", "MG39", "MG57", "MG61"];
 
 // Utility to format timestamp for datetime-local input
 const formatTimestampForInput = (timestamp: number): string => {
@@ -35,12 +36,17 @@ const DataAnalysisPage: React.FC = () => {
     setLoading(true);
 
     try {
-      const res = await apiService.get(Endpoint.FETCH_DATA_ANALYSIS, {
-        devices: selectedDevices.join(","),
-        param: "sPM2",
-        start_time: startTime,
-        end_time: endTime,
-      });
+      const res = await axios.get(
+        "http://127.0.0.1:9000/spatio-temporal/raw",
+        {
+          params: {
+            devices: selectedDevices.join(","),
+            param: "sPM2",
+            start_time: startTime,
+            end_time: endTime,
+          },
+        }
+      );
 
       // ⭐ TOKEN EXPIRED → NO DATA
       if (!res) {
@@ -71,7 +77,7 @@ const DataAnalysisPage: React.FC = () => {
           .map((item: any) => {
             const lat = Number(item.lat ?? item.latitude);
             const lng = Number(item.long ?? item.lon ?? item.lng ?? item.longitude);
-
+            
             return {
               lat,
               lng,

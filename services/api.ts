@@ -342,10 +342,6 @@ class Mock extends ApiService {
   async patch() {
     return {};
   }
-  async getRamanAnalysis() {
-    return {};
-  }
-
 
 
   async uploadFirmware() { return {}; }

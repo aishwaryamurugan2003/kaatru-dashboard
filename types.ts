@@ -4,6 +4,7 @@ export interface DeviceDataPoint {
   lat: number;
   long: number;
   dTS: number;
+  lng: number;
 }
 
 export interface ChartSeries {
