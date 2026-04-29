@@ -14,8 +14,6 @@ export const Endpoint = {
   ACCESS_MANAGEMENT_SYNC: "https://caas.kaatru.org/admin/access-management/sync",
   DATA_DOWNLOAD: "http://bw02.kaatru.org/job/data/download",
 
-  // ✅ NEW
-  SENSOR_HISTORY: "https://bw06.kaatru.org/stale/filter",
 
   // ✅ OTA ENDPOINTS
   OTA_UPLOAD_FIRMWARE: "/user/upload",
@@ -56,11 +54,7 @@ abstract class ApiService {
   abstract getUserFullAccess(userId: string): Promise<any[]>;
   abstract syncUserAccess(userId: string, access: any[]): Promise<any>;
 
-  // ✅ NEW
-  abstract fetchSensorHistory(
-    deviceId: string,
-    filter: string
-  ): Promise<any>;
+
 
   // ✅ OTA METHODS
   abstract uploadFirmware(deviceId: string, deviceGroup: string, file: File): Promise<any>;
@@ -79,11 +73,11 @@ abstract class ApiService {
 
   abstract disconnectAllWebSockets(): void;
   abstract downloadData(payload: {
-  startTime: string;
-  endTime: string;
-  device: string;
-  email: string;
-}): Promise<any>;
+    startTime: string;
+    endTime: string;
+    device: string;
+    email: string;
+  }): Promise<any>;
 }
 
 /* ------------------------------------------------------------
@@ -100,7 +94,7 @@ class Production extends ApiService {
     console.log("🌍 API HOST:", this.#host);
   }
 
-  setKeycloakToken(_: string) {}
+  setKeycloakToken(_: string) { }
 
   clearToken() {
     localStorage.removeItem("token");
@@ -127,10 +121,10 @@ class Production extends ApiService {
     localStorage.setItem("token", res.data.access_token);
     return res;
   }
-async isLoggedIn() {
-  const token = localStorage.getItem("token");
-  return isTokenAlive(token);
-}
+  async isLoggedIn() {
+    const token = localStorage.getItem("token");
+    return isTokenAlive(token);
+  }
 
 
   async get(endpoint: string, payload?: any) {
@@ -166,22 +160,7 @@ async isLoggedIn() {
     return this.get(endpoint, payload);
   }
 
-  /* ------------------------------------------------------------
-     ✅ SENSOR HISTORY API (YOUR REQUEST)
-  ------------------------------------------------------------ */
-  async fetchSensorHistory(deviceId: string, filter: string) {
-    const encodedId = encodeURIComponent(deviceId);
 
-    const res = await axios.get(Endpoint.SENSOR_HISTORY, {
-      params: {
-        devices: encodedId,
-        filter,
-      },
-      headers: this.#getHeaders(),
-    });
-
-    return res.data;
-  }
 
   /* ------------------------------------------------------------
      ✅ OTA API
@@ -218,9 +197,9 @@ async isLoggedIn() {
 
   async getFirmwareFile(deviceId: string, version: string) {
     const url = this.#buildUrl(`${Endpoint.OTA_DEVICE_FIRMWARE_FILE}/${deviceId}/${version}`);
-    const res = await axios.get(url, { 
+    const res = await axios.get(url, {
       headers: this.#getHeaders(),
-      responseType: "blob" 
+      responseType: "blob"
     });
     return res.data;
   }
@@ -235,13 +214,13 @@ async isLoggedIn() {
   }
 
   async fetchDevices(): Promise<any[]> {
-  const res = await axios.get(Endpoint.GROUP_DEVICES, {
-    headers: this.#getHeaders(),
-  });
+    const res = await axios.get(Endpoint.GROUP_DEVICES, {
+      headers: this.#getHeaders(),
+    });
 
-  // 🔥 IMPORTANT: adjust based on response
-  return res.data || [];
-}
+    // 🔥 IMPORTANT: adjust based on response
+    return res.data || [];
+  }
 
   /* ------------------------------------------------------------
      FETCH USER ACCESS
@@ -309,41 +288,41 @@ async isLoggedIn() {
     Object.values(this.#wsChannels).forEach((ws) => ws.close());
     this.#wsChannels = {};
   }
- async downloadData(payload: {
-  startTime: string;
-  endTime: string;
-  device: string;
-  email: string;
-}) {
-  const url = this.#buildUrl(Endpoint.DATA_DOWNLOAD);
+  async downloadData(payload: {
+    startTime: string;
+    endTime: string;
+    device: string;
+    email: string;
+  }) {
+    const url = this.#buildUrl(Endpoint.DATA_DOWNLOAD);
 
-  // ✅ Convert to timestamps
-  const st = new Date(payload.startTime).getTime();
-  const et = new Date(payload.endTime).getTime();
+    // ✅ Convert to timestamps
+    const st = new Date(payload.startTime).getTime();
+    const et = new Date(payload.endTime).getTime();
 
-  const res = await axios.post(
-    url,
-    {
-      st,
-      et,
-      cols: payload.device, // 🔥 IMPORTANT rename
-      email: payload.email,
-    },
-    {
-      headers: this.#getHeaders(),
-    }
-  );
+    const res = await axios.post(
+      url,
+      {
+        st,
+        et,
+        cols: payload.device, // 🔥 IMPORTANT rename
+        email: payload.email,
+      },
+      {
+        headers: this.#getHeaders(),
+      }
+    );
 
-  return res.data;
-}
+    return res.data;
+  }
 }
 
 /* ------------------------------------------------------------
    MOCK API
 ------------------------------------------------------------ */
 class Mock extends ApiService {
-  clearToken() {}
-  setKeycloakToken() {}
+  clearToken() { }
+  setKeycloakToken() { }
   async isLoggedIn() {
     return true;
   }
@@ -367,9 +346,7 @@ class Mock extends ApiService {
     return {};
   }
 
-  async fetchSensorHistory() {
-    return {};
-  }
+
 
   async uploadFirmware() { return {}; }
   async setRunningVersion() { return {}; }
@@ -384,14 +361,14 @@ class Mock extends ApiService {
     return {};
   }
   async fetchDevices() {
-  return [];
-}
-async downloadData() {
-  return { message: "Mock download success" };
-}
+    return [];
+  }
+  async downloadData() {
+    return { message: "Mock download success" };
+  }
 
-  connectDeviceWebSocket() {}
-  disconnectAllWebSockets() {}
+  connectDeviceWebSocket() { }
+  disconnectAllWebSockets() { }
 }
 
 /* ------------------------------------------------------------
@@ -402,26 +379,69 @@ export const apiService: ApiService =
     ? new Production()
     : new Mock();
 /* ------------------------------------------------------------
+   🔥 NEW BACKEND API FUNCTIONS
+------------------------------------------------------------ */
+export async function fetchSensorData({
+  deviceIds,
+  fields = "temp,rh,sPM2",
+  start = "-12h",
+  stop = "now()",
+  interval = "5m",
+}: {
+  deviceIds: string[];
+  fields?: string;
+  start?: string;
+  stop?: string;
+  interval?: string;
+}) {
+  const params = new URLSearchParams({
+    device_id: deviceIds.join(","),
+    measurement: "gurprod",
+    start,
+    stop,
+    interval,
+    fields,
+    timestamp_representation: "start",
+  });
+
+  const res = await fetch(
+    `http://127.0.0.1:8001/v1/data?${params.toString()}`
+  );
+
+  return res.json();
+}
+
+export async function fetchFields() {
+  const res = await fetch("http://127.0.0.1:8001/v1/fields");
+  return res.json();
+}
+
+export async function checkHealth() {
+  const res = await fetch("http://127.0.0.1:8001/v1/health");
+  return res.json();
+}
+
+/* ------------------------------------------------------------
    🔥 CONVERT API → CHART DATA
 ------------------------------------------------------------ */
-export function convertHistoryToTimeSeries(api: any, field: string) {
-  if (!api || !api.data) {
-    console.error("❌ Invalid API response");
-    return [];
-  }
+export function convertToTimeSeries(apiResponse: any, field: string) {
+  const result: any[] = [];
 
-  const rawData = api.data?.[0]?.data || [];
+  if (!apiResponse || !apiResponse.data) return result;
 
-  if (!rawData.length) {
-    console.warn("⚠️ No data received from API");
-    return [];
-  }
+  apiResponse.data.forEach((device: any) => {
+    if (device.status !== 200) return;
 
-  return rawData
-    .filter((entry: any) => typeof entry[field] === "number" && entry.srvtime)
-    .map((entry: any) => ({
-      srvtime: entry.srvtime,
-      [field]: entry[field] === 0 ? 0.01 : entry[field],
-    }))
-    .sort((a: any, b: any) => a.srvtime - b.srvtime);
+    if (Array.isArray(device.data)) {
+      device.data.forEach((entry: any) => {
+        result.push({
+          srvtime: entry.srvtime,
+          value: entry.data?.[field] ?? 0,
+          device: device.dID,
+        });
+      });
+    }
+  });
+
+  return result.sort((a, b) => a.srvtime - b.srvtime);
 }

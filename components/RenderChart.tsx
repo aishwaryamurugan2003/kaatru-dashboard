@@ -11,7 +11,7 @@ import {
   PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer
 } from "recharts";
-import { apiService, convertHistoryToTimeSeries } from "../services/api";
+import { fetchSensorData, convertToTimeSeries } from "../services/api";
 
 function formatTime(value: any) {
   if (!value) return "";
@@ -84,55 +84,16 @@ export function RenderChart({
       setLoading(true);
 
       try {
-        const allData: any[] = [];
+        const deviceIds = devices.map((d: any) => d.value);
 
-        for (const d of devices) {
-          try {
-            const deviceId = d.value.toUpperCase();
+        const apiResponse = await fetchSensorData({
+          deviceIds,
+          fields: yKey.toLowerCase(), // ✅ FIX
+        });
 
-            // ✅ Decide endpoint based on device type
-            const useStale =
-              deviceId.startsWith("SG") ||
-              deviceId.startsWith("MG") ||
-              deviceId.startsWith("LMG");
-
-            let api;
-
-            if (useStale) {
-              // ✅ Gurugram devices
-              api = await apiService.get(
-                `https://bw06.kaatru.org/stale/filter`,
-                {
-                  devices: d.value,
-                  filter: "15M",
-                }
-              );
-
-              // IMPORTANT: normalize structure
-              api = api.data;
-            } else {
-              // ✅ Normal devices (SIN etc.)
-              api = await apiService.fetchSensorHistory(d.value, "15M");
-            }
-
-            // ✅ Convert to chart format
-            const result = convertHistoryToTimeSeries(api, yKey);
-
-            const withDevice = result.map((r: any) => ({
-              ...r,
-              device: d.value,
-            }));
-
-            allData.push(...withDevice);
-          } catch (deviceError) {
-            console.warn(`Device ${d.value} skipped`, deviceError);
-          }
-        }
-
-        allData.sort((a, b) => a.srvtime - b.srvtime);
+        const allData = convertToTimeSeries(apiResponse, yKey);
 
         console.log("FINAL CHART DATA:", allData);
-
         setData(allData);
       } catch (e) {
         console.error("CRITICAL API ERROR", e);
@@ -227,7 +188,7 @@ export function RenderChart({
                   hide={isolatedDevice !== null && isolatedDevice !== d.label}
                   key={d.value}
                   type="monotone"
-                  dataKey={(entry) => entry.device === d.value ? entry[yKey] : null}
+                  dataKey={(entry) => entry.device === d.value ? entry.value : null}
                   stroke={COLORS[index % COLORS.length]}
                   fill={`url(#color${d.value})`}
                   strokeWidth={2.5}
@@ -276,13 +237,13 @@ export function RenderChart({
                 <Bar
                   hide={isolatedDevice !== null && isolatedDevice !== d.label}
                   key={d.value}
-                  dataKey={(entry) => entry.device === d.value ? entry[yKey] : null}
+                  dataKey={(entry) => entry.device === d.value ? entry.value : null}
                   fill={COLORS[index % COLORS.length]}
                   name={d.label}
                   radius={[4, 4, 0, 0]}
                 />
               )) : (
-                <Bar dataKey={yKey} fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} />
               )}
               {refAreaLeft && refAreaRight ? (
                 <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#3b82f6" fillOpacity={0.1} />
@@ -301,7 +262,7 @@ export function RenderChart({
               <Pie
                 data={data.map((d, i) => ({
                   name: formatTime(d.srvtime),
-                  value: d[yKey],
+                  value: d.value,
                 }))}
                 dataKey="value"
                 nameKey="name"
@@ -335,7 +296,7 @@ export function RenderChart({
                 tick={{ fill: '#6b7280', fontSize: 12 }}
               />
               <YAxis
-                dataKey={(entry) => entry[yKey] || 0}
+                dataKey={(entry) => entry.value || 0}
                 domain={['auto', 'auto']}
                 tickCount={6}
                 tick={{ fill: '#6b7280', fontSize: 12 }}
@@ -392,8 +353,8 @@ export function RenderChart({
                 contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
               />
               <Legend />
-              <Bar dataKey={(entry) => entry[yKey] || 0} fill="#10b981" radius={[4, 4, 0, 0]} />
-              <Line type="monotone" dataKey={(entry) => entry[yKey] || 0} stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
+              <Bar dataKey={(entry) => entry.value || 0} fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Line type="monotone" dataKey={(entry) => entry.value || 0} stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
               {refAreaLeft && refAreaRight ? (
                 <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#3b82f6" fillOpacity={0.1} />
               ) : null}
@@ -405,7 +366,7 @@ export function RenderChart({
             <RadarChart
               data={data.map((d) => ({
                 time: formatTime(d.srvtime),
-                value: d[yKey],
+                value: d.value,
               }))}
             >
               <PolarGrid stroke="#e5e7eb" />

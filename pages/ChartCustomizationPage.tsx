@@ -12,8 +12,7 @@ import {
   PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer
 } from "recharts";
-import { mockApiResponse, convertToDeviceSummary, convertToTimeSeries } from "../services/mockDevices";
-import { apiService, convertHistoryToTimeSeries, Endpoint } from "@/services/api";
+import { apiService, fetchSensorData, convertToTimeSeries, Endpoint } from "@/services/api";
 function formatTime(value: any) {
   if (!value) return "";
   const date = new Date(value);
@@ -69,7 +68,7 @@ function RenderChart({
 
   // Legend isolation state
   const [isolatedDevice, setIsolatedDevice] = useState<string | null>(null);
-  
+
   const handleLegendClick = (e: any) => {
     const clickedItem = e.value;
     setIsolatedDevice((prev) => (prev === clickedItem ? null : clickedItem));
@@ -100,31 +99,31 @@ function RenderChart({
     setZoomLeft("dataMin");
     setZoomRight("dataMax");
   };
-
   useEffect(() => {
     async function load() {
       if (!yKey || yKey === "device" || devices.length === 0) return;
+
       setLoading(true);
+
       try {
-        const allData: any[] = [];
-        await Promise.all(
-          devices.map(async (d: any) => {
-            const api = await apiService.fetchSensorHistory(d.value, "15M");
-            const result = convertHistoryToTimeSeries(api, yKey);
-            const withDevice = result.map((r: any) => ({
-              ...r,
-              device: d.value,
-            }));
-            allData.push(...withDevice);
-          })
-        );
-        allData.sort((a, b) => a.srvtime - b.srvtime); // VERY IMPORTANT FOR RECHARTS
+        const deviceIds = devices.map((d: any) => d.value);
+
+        const apiResponse = await fetchSensorData({
+          deviceIds,
+          fields: yKey.toLowerCase(),
+          interval: "15m",
+        });
+
+        const allData = convertToTimeSeries(apiResponse, yKey);
+
         setData(allData);
       } catch (e) {
         console.error("API ERROR", e);
       }
+
       setLoading(false);
     }
+
     load();
   }, [yKey, devices]);
 
@@ -165,7 +164,7 @@ function RenderChart({
       <ResponsiveContainer width="100%" height={300}>
         <>
           {type === "line" && (
-            <AreaChart 
+            <AreaChart
               data={data}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
@@ -174,8 +173,8 @@ function RenderChart({
               <defs>
                 {devices.map((d, index) => (
                   <linearGradient key={d.value} id={`color${d.value}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0}/>
+                    <stop offset="5%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0} />
                   </linearGradient>
                 ))}
               </defs>
@@ -191,10 +190,10 @@ function RenderChart({
                 axisLine={{ stroke: '#e5e7eb' }}
                 tickLine={{ stroke: '#e5e7eb' }}
               />
-              <YAxis 
+              <YAxis
                 domain={['auto', 'auto']}
                 tickCount={6}
-                tickFormatter={(val) => Math.round(val).toString()} 
+                tickFormatter={(val) => Math.round(val).toString()}
                 tick={{ fill: '#6b7280', fontSize: 12 }}
                 tickMargin={10}
                 axisLine={{ stroke: '#e5e7eb' }}
@@ -211,7 +210,7 @@ function RenderChart({
                   hide={isolatedDevice !== null && isolatedDevice !== d.label}
                   key={d.value}
                   type="monotone"
-                  dataKey={(entry) => entry.device === d.value ? entry[yKey] : null}
+                  dataKey={(entry) => entry.device === d.value ? entry.value : null}
                   stroke={COLORS[index % COLORS.length]}
                   fill={`url(#color${d.value})`}
                   strokeWidth={2.5}
@@ -228,11 +227,11 @@ function RenderChart({
 
           {/* ---------------- BAR CHART ---------------- */}
           {type === "bar" && (
-            <BarChart 
-               data={data}
-               onMouseDown={handleMouseDown}
-               onMouseMove={handleMouseMove}
-               onMouseUp={handleMouseUp}
+            <BarChart
+              data={data}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
               <XAxis
@@ -244,10 +243,10 @@ function RenderChart({
                 tick={{ fill: '#6b7280', fontSize: 12 }}
                 axisLine={{ stroke: '#e5e7eb' }}
               />
-              <YAxis 
-                domain={['auto', 'auto']} 
-                tickCount={6} 
-                tick={{ fill: '#6b7280', fontSize: 12 }} 
+              <YAxis
+                domain={['auto', 'auto']}
+                tickCount={6}
+                tick={{ fill: '#6b7280', fontSize: 12 }}
                 axisLine={{ stroke: '#e5e7eb' }}
               />
               <Tooltip
@@ -257,11 +256,11 @@ function RenderChart({
               />
               <Legend wrapperStyle={{ cursor: 'pointer' }} onClick={handleLegendClick} />
               {devices.length > 0 ? devices.map((d, index) => (
-                <Bar 
+                <Bar
                   hide={isolatedDevice !== null && isolatedDevice !== d.label}
-                  key={d.value} 
-                  dataKey={(entry) => entry.device === d.value ? entry[yKey] : null} 
-                  fill={COLORS[index % COLORS.length]} 
+                  key={d.value}
+                  dataKey={(entry) => entry.device === d.value ? entry.value : null}
+                  fill={COLORS[index % COLORS.length]}
                   name={d.label}
                   radius={[4, 4, 0, 0]}
                 />
@@ -305,9 +304,9 @@ function RenderChart({
           {/* ---------------- SCATTER ---------------- */}
           {type === "scatter" && (
             <ScatterChart
-               onMouseDown={handleMouseDown}
-               onMouseMove={handleMouseMove}
-               onMouseUp={handleMouseUp}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
               <XAxis
@@ -318,11 +317,11 @@ function RenderChart({
                 tickFormatter={(value) => formatTime(value)}
                 tick={{ fill: '#6b7280', fontSize: 12 }}
               />
-              <YAxis 
-                dataKey={(entry) => entry[yKey] || 0} 
-                domain={['auto', 'auto']} 
-                tickCount={6} 
-                tick={{ fill: '#6b7280', fontSize: 12 }} 
+              <YAxis
+                dataKey={(entry) => entry.value || 0}
+                domain={['auto', 'auto']}
+                tickCount={6}
+                tick={{ fill: '#6b7280', fontSize: 12 }}
               />
               <Tooltip
                 labelFormatter={(value) => formatTime(value)}
@@ -332,15 +331,15 @@ function RenderChart({
               />
               <Legend wrapperStyle={{ cursor: 'pointer' }} onClick={handleLegendClick} />
               {devices.length > 0 ? devices.map((d, index) => (
-                 <Scatter 
-                   hide={isolatedDevice !== null && isolatedDevice !== d.label}
-                   key={d.value} 
-                   name={d.label} 
-                   data={data.filter(entry => entry.device === d.value)} 
-                   fill={COLORS[index % COLORS.length]} 
-                 />
+                <Scatter
+                  hide={isolatedDevice !== null && isolatedDevice !== d.label}
+                  key={d.value}
+                  name={d.label}
+                  data={data.filter(entry => entry.device === d.value)}
+                  fill={COLORS[index % COLORS.length]}
+                />
               )) : (
-                 <Scatter data={data} fill="#f59e0b" />
+                <Scatter data={data} fill="#f59e0b" />
               )}
               {refAreaLeft && refAreaRight ? (
                 <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#3b82f6" fillOpacity={0.1} />
@@ -350,7 +349,7 @@ function RenderChart({
 
           {/* ---------------- COMPOSED ---------------- */}
           {type === "composed" && (
-            <ComposedChart 
+            <ComposedChart
               data={data}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
@@ -365,10 +364,10 @@ function RenderChart({
                 tickFormatter={(value) => formatTime(value)}
                 tick={{ fill: '#6b7280', fontSize: 12 }}
               />
-              <YAxis 
-                domain={['auto', 'auto']} 
-                tickCount={6} 
-                tick={{ fill: '#6b7280', fontSize: 12 }} 
+              <YAxis
+                domain={['auto', 'auto']}
+                tickCount={6}
+                tick={{ fill: '#6b7280', fontSize: 12 }}
               />
               <Tooltip
                 labelFormatter={(value) => formatTime(value)}
@@ -376,8 +375,8 @@ function RenderChart({
                 contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
               />
               <Legend />
-              <Bar dataKey={(entry) => entry[yKey] || 0} fill="#10b981" radius={[4, 4, 0, 0]} />
-              <Line type="monotone" dataKey={(entry) => entry[yKey] || 0} stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
+              <Bar dataKey={(entry) => entry.value || 0} fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Line type="monotone" dataKey={(entry) => entry.value || 0} stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
               {refAreaLeft && refAreaRight ? (
                 <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#3b82f6" fillOpacity={0.1} />
               ) : null}
@@ -422,79 +421,79 @@ export default function ChartCustomizationPage() {
   const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
 
   useEffect(() => {
-  async function loadGroups() {
-    try {
-      const res = await apiService.getRamanAnalysis(
-        Endpoint.GROUP_ALL
-      );
-
-      if (Array.isArray(res?.data)) {
-        setGroupOptions(
-          res.data.map((g: any) => ({
-            label: g.name,
-            value: g.id,
-          }))
+    async function loadGroups() {
+      try {
+        const res = await apiService.getRamanAnalysis(
+          Endpoint.GROUP_ALL
         );
+
+        if (Array.isArray(res?.data)) {
+          setGroupOptions(
+            res.data.map((g: any) => ({
+              label: g.name,
+              value: g.id,
+            }))
+          );
+        }
+      } catch (e) {
+        console.error("GROUP FETCH ERROR", e);
       }
-    } catch (e) {
-      console.error("GROUP FETCH ERROR", e);
-    }
-  }
-
-  loadGroups();
-}, []);
-
-
-
-/* ✅ ADD HERE */
-useEffect(() => {
-  async function loadDevices() {
-    if (!selectedGroup) {
-      setDeviceOptions([]);
-      setSelectedDevices([]);
-      return;
     }
 
-    try {
-      const res = await apiService.getRamanAnalysis(
-        Endpoint.GROUP_DEVICES,
-        { id: selectedGroup.value }
-      );
+    loadGroups();
+  }, []);
 
-      if (res?.data?.devices) {
-        const formatted = res.data.devices.map((d: string) => ({
-          value: d,
-          label: d,
-        }));
 
-        setDeviceOptions(formatted);
+
+  /* ✅ ADD HERE */
+  useEffect(() => {
+    async function loadDevices() {
+      if (!selectedGroup) {
+        setDeviceOptions([]);
+        setSelectedDevices([]);
+        return;
       }
-    } catch (e) {
-      console.error("DEVICE FETCH ERROR", e);
+
+      try {
+        const res = await apiService.getRamanAnalysis(
+          Endpoint.GROUP_DEVICES,
+          { id: selectedGroup.value }
+        );
+
+        if (res?.data?.devices) {
+          const formatted = res.data.devices.map((d: string) => ({
+            value: d,
+            label: d,
+          }));
+
+          setDeviceOptions(formatted);
+        }
+      } catch (e) {
+        console.error("DEVICE FETCH ERROR", e);
+      }
     }
-  }
 
-  loadDevices();
-}, [selectedGroup]);
+    loadDevices();
+  }, [selectedGroup]);
 
-// useEffect(() => {
-//   async function loadDevices() {
-//     try {
-//       const devices = await apiService.fetchDevices();
+  // useEffect(() => {
+  //   async function loadDevices() {
+  //     try {
+  //       const devices = await apiService.fetchDevices();
 
-//       const formatted = devices.map((d: any) => ({
-//         value: d.dID || d.deviceId,
-//         label: d.dID || d.deviceId,
-//       }));
+  //       const formatted = devices.map((d: any) => ({
+  //         value: d.dID || d.deviceId,
+  //         label: d.dID || d.deviceId,
+  //       }));
 
-//       setDeviceOptions(formatted);
-//     } catch (e) {
-//       console.error("DEVICE FETCH ERROR", e);
-//     }
-//   }
+  //       setDeviceOptions(formatted);
+  //     } catch (e) {
+  //       console.error("DEVICE FETCH ERROR", e);
+  //     }
+  //   }
 
-//   loadDevices();
-// }, []);
+  //   loadDevices();
+  // }, []);
 
   /* Load charts from localStorage */
   useEffect(() => {
@@ -509,57 +508,57 @@ useEffect(() => {
   /* Save charts to localStorage */
   const STORAGE_KEY = "customCharts";
 
-/* Load charts from localStorage on first render */
-const [charts, setCharts] = useState<ChartConfig[]>(() => {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
-  } catch {
-    return [];
+  /* Load charts from localStorage on first render */
+  const [charts, setCharts] = useState<ChartConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  /* Save charts whenever they change */
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(charts));
+    } catch (err) {
+      console.error("Failed to save charts", err);
+    }
+  }, [charts]);
+
+  function addChart() {
+    if (!xKey || !yKey) {
+      alert("Please select both X-axis and Y-axis");
+      return;
+    }
+
+    if (type === "pie" && xKey !== "device") {
+      alert("Pie chart requires 'device' as X-axis");
+      return;
+    }
+
+    if (type === "scatter" && xKey === "device") {
+      alert("Scatter chart requires numeric X-axis");
+      return;
+    }
+
+    const newChart: ChartConfig = {
+      id: Date.now().toString(),
+      type,
+      xKey,
+      yKey,
+      x: 0,        // column position
+      y: Infinity, // place at bottom automatically
+      w: 6,        // width (columns)
+      h: 6,        // height (rows)
+    };
+
+    setCharts((prev) => [...prev, newChart]);
+    setShowAdd(false);
+    setXKey("");
+    setYKey("");
   }
-});
-
-/* Save charts whenever they change */
-useEffect(() => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(charts));
-  } catch (err) {
-    console.error("Failed to save charts", err);
-  }
-}, [charts]);
-
-function addChart() {
-  if (!xKey || !yKey) {
-    alert("Please select both X-axis and Y-axis");
-    return;
-  }
-
-  if (type === "pie" && xKey !== "device") {
-    alert("Pie chart requires 'device' as X-axis");
-    return;
-  }
-
-  if (type === "scatter" && xKey === "device") {
-    alert("Scatter chart requires numeric X-axis");
-    return;
-  }
-
-  const newChart: ChartConfig = {
-    id: Date.now().toString(),
-    type,
-    xKey,
-    yKey,
-    x: 0,        // column position
-    y: Infinity, // place at bottom automatically
-    w: 6,        // width (columns)
-    h: 6,        // height (rows)
-  };
-
-  setCharts((prev) => [...prev, newChart]);
-  setShowAdd(false);
-  setXKey("");
-  setYKey("");
-}
 
 
   function removeChart(id: string) {
@@ -572,24 +571,24 @@ function addChart() {
   }
 
   return (
-   <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6">
 
-  {/* ✅ GROUP DROPDOWN */}
-  <Select
-    options={groupOptions}
-    value={selectedGroup}
-    onChange={(val) => setSelectedGroup(val)}
-    placeholder="Select group..."
-  />
+      {/* ✅ GROUP DROPDOWN */}
+      <Select
+        options={groupOptions}
+        value={selectedGroup}
+        onChange={(val) => setSelectedGroup(val)}
+        placeholder="Select group..."
+      />
 
-  {/* ✅ DEVICE DROPDOWN */}
-  <Select
-    isMulti
-    options={deviceOptions}
-    value={selectedDevices}
-    onChange={(val) => setSelectedDevices([...(val || [])])}
-    placeholder="Select devices..."
-  />
+      {/* ✅ DEVICE DROPDOWN */}
+      <Select
+        isMulti
+        options={deviceOptions}
+        value={selectedDevices}
+        onChange={(val) => setSelectedDevices([...(val || [])])}
+        placeholder="Select devices..."
+      />
       <div className="flex gap-3">
         <button
           className="bg-blue-600 text-white px-4 py-2 rounded-lg"
