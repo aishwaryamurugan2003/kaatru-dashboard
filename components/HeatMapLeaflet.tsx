@@ -179,7 +179,7 @@ const CircleMarkersLayer: React.FC<{ points: MapPoint[] }> = ({ points }) => {
     });
 
     points.forEach((p) => {
-      L.circle([p.lat, p.lng], {
+      L.circle([p.lat, p.long], {
         radius: 50, // 500 meters
         color: getPM25Color(p.sPM2),
         weight: 1,
@@ -205,8 +205,8 @@ const HeatMapLeaflet: React.FC<{ data: MapPoint[]; loading: boolean }> = ({
       return new L.LatLngBounds([12.97, 77.59], [13.08, 80.27]);
     }
     return new L.LatLngBounds(
-      [Math.min(...data.map((p) => p.lat)), Math.min(...data.map((p) => p.lng))],
-      [Math.max(...data.map((p) => p.lat)), Math.max(...data.map((p) => p.lng))]
+      [Math.min(...data.map((p) => p.lat)), Math.min(...data.map((p) => p.long))],
+      [Math.max(...data.map((p) => p.lat)), Math.max(...data.map((p) => p.long))]
     );
   }, [data]);
 

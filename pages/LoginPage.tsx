@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useRive } from "rive-react";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -10,11 +9,17 @@ const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const { RiveComponent } = useRive({
-    src: "/animations/login.riv",
-    stateMachines: "State Machine 1",
-    autoplay: true,
-  });
+  // <div className="hidden lg:flex w-1/2 bg-[#2563eb] items-center justify-center p-8">
+  //   <div className="w-3/4 h-3/4 rounded-xl overflow-hidden shadow-lg bg-white flex items-center justify-center">
+
+  //     <img
+  //       src="/animations/image.png"
+  //       alt="Login illustration"
+  //       className="w-full h-full object-cover"
+  //     />
+
+  //   </div>
+  // </div>
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,13 +74,17 @@ const LoginPage: React.FC = () => {
   return (
     <div className="w-full h-screen flex bg-gray-100 font-inter">
 
-      {/* LEFT SIDE RIVE */}
-      <div className="hidden lg:flex w-1/2 bg-[#2563eb] items-center justify-center p-8">
-        <div className="w-3/4 h-3/4 rounded-xl overflow-hidden shadow-lg bg-white">
-          <RiveComponent />
+      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 items-center justify-center p-12">
+        <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border border-white/10 backdrop-blur">
+
+          <img
+            src="/animations/image.png"
+            alt="Dashboard preview"
+            className="w-full h-auto object-cover"
+          />
+
         </div>
       </div>
-
       {/* RIGHT SIDE LOGIN */}
       <div className="flex w-full lg:w-1/2 items-center justify-center bg-white px-8">
         <div className="w-full max-w-md">
