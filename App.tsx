@@ -17,6 +17,8 @@ import MultiDeviceDashboardPage from "./pages/MultiDeviceDashboardPage";
 import { isTokenAlive } from "./utils/token";
 import { apiService } from "./services/api";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import DashboardRealtimeDebugPage from "./pages/DashboardRealtimeDebug";
+import GroupRealtimeDetail from "./pages/GroupRealtimeDetail";
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -64,6 +66,28 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <DashboardExplorerPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/realtime/health"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <DashboardRealtimeDebugPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/realtime/health/:groupId"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <GroupRealtimeDetail />
               </DashboardLayout>
             </ProtectedRoute>
           }

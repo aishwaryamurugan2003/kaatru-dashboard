@@ -1,5 +1,7 @@
 import React, { useRef } from "react";
 import { NavLink } from "react-router-dom";
+import { VscDebugAlt } from "react-icons/vsc";
+
 
 interface SidebarProps {
   isOpen: boolean;
@@ -119,7 +121,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
           <NavItem
             to="/data-analysis"
             isExpanded={isOpen}
-            label="Data Analysis"
+            label="Mobile Device Analysis"
             icon={
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -250,6 +252,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
             }
           />
 
+          <NavItem
+            to="/realtime/health"
+            isExpanded={isOpen}
+            label="Realtime Debug"
+            icon={
+              <VscDebugAlt />
+            }
+          />
 
         </ul>
       </nav>
