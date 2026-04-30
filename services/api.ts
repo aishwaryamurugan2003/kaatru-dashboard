@@ -321,6 +321,9 @@ class Production extends ApiService {
    MOCK API
 ------------------------------------------------------------ */
 class Mock extends ApiService {
+  getRamanAnalysis(endpoint: string, payload?: Record<string, any>): Promise<any> {
+    throw new Error("Method not implemented.");
+  }
   clearToken() { }
   setKeycloakToken() { }
   async isLoggedIn() {

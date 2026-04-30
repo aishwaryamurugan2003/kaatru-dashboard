@@ -88,7 +88,7 @@ export function RenderChart({
 
         const apiResponse = await fetchSensorData({
           deviceIds,
-          fields: yKey.toLowerCase(), // ✅ FIX
+          fields: yKey,
         });
 
         const allData = convertToTimeSeries(apiResponse, yKey);

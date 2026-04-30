@@ -8,7 +8,7 @@ import {
   Legend,
 } from "recharts";
 import { useEffect, useState } from "react";
-import { apiService } from "../services/api";
+import { fetchSensorData } from "../services/api";
 import { parseSensorHistory } from "../utils/parseSensorHistory";
 import Loading from "../components/Loading";
 
@@ -40,18 +40,22 @@ export default function SensorHistoryChart({
 
     setLoading(true);
 
-    apiService
-      .fetchSensorHistory(deviceId, filter)
+    fetchSensorData({
+      deviceIds: [deviceId],
+      fields: "sPM2,sPM10,temp,rh",
+      start: "-14d",
+      interval: "10h",
+    })
       .then((res) => {
         const parsed = parseSensorHistory(res);
-        const merged = parsed.pm25.map((_, i) => ({
-  time: parsed.pm25[i]?.time,
-  pm25: parsed.pm25[i]?.value,
-  pm10: parsed.pm10[i]?.value,
-  temp: parsed.temp[i]?.value,
-  humidity: parsed.humidity[i]?.value,
-}));
 
+        const merged = parsed.pm25.map((_, i) => ({
+          time: parsed.pm25[i]?.time,
+          pm25: parsed.pm25[i]?.value,
+          pm10: parsed.pm10[i]?.value,
+          temp: parsed.temp[i]?.value,
+          humidity: parsed.humidity[i]?.value,
+        }));
 
         setData(merged);
       })
@@ -76,11 +80,10 @@ export default function SensorHistoryChart({
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
-              className={`px-2 py-1 text-xs rounded ${
-                filter === f.value
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 dark:bg-gray-700"
-              }`}
+              className={`px-2 py-1 text-xs rounded ${filter === f.value
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 dark:bg-gray-700"
+                }`}
             >
               {f.label}
             </button>
@@ -114,31 +117,31 @@ export default function SensorHistoryChart({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data}>
               <XAxis
-  dataKey="time"
-  tickFormatter={(value) => {
-    if (!value) return "";
+                dataKey="time"
+                tickFormatter={(value) => {
+                  if (!value) return "";
 
-    const d = new Date(value);
-    if (isNaN(d.getTime())) return value;
+                  const d = new Date(value);
+                  if (isNaN(d.getTime())) return value;
 
-    return d.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }}
-/>
+                  return d.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
+                }}
+              />
 
               <YAxis />
               <Tooltip
-  labelFormatter={(value) => {
-    if (!value) return "";
+                labelFormatter={(value) => {
+                  if (!value) return "";
 
-    const d = new Date(value);
-    if (isNaN(d.getTime())) return value;
+                  const d = new Date(value);
+                  if (isNaN(d.getTime())) return value;
 
-    return d.toLocaleString();
-  }}
-/>
+                  return d.toLocaleString();
+                }}
+              />
 
               <Legend />
 
