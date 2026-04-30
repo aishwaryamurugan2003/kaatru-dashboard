@@ -13,6 +13,8 @@ import {
     AppstoreOutlined,
 } from "@ant-design/icons";
 import { Tooltip, Avatar, Badge, Empty, Card } from "antd";
+import { FaTemperatureEmpty } from "react-icons/fa6";
+
 
 
 
@@ -49,13 +51,13 @@ const RULES_CONFIG = [
     //     threshold: 100000,
     //     type: "threshold",
     // },
-    {
-        id: "voc",
-        label: "VOC",
-        icon: "FireOutlined",
-        fields: ["sVocI"],
-        type: "non_null",
-    },
+    // {
+    //     id: "voc",
+    //     label: "VOC",
+    //     icon: "FireOutlined",
+    //     fields: ["sVocI"],
+    //     type: "non_null",
+    // },
     {
         id: "wifi",
         label: "Net",
@@ -86,13 +88,15 @@ interface DeviceData {
     [key: string]: any;
 }
 
+
+
 const getIcon = (iconName: string) => {
     switch (iconName) {
         case "CloudOutlined": return <CloudOutlined />;
-        case "ExperimentOutlined": return <ExperimentOutlined />;
+        case "ExperimentOutlined": return <FaTemperatureEmpty />;
         case "EnvironmentOutlined": return <EnvironmentOutlined />;
         case "ThunderboltOutlined": return <ThunderboltOutlined />;
-        case "FireOutlined": return <FireOutlined />;
+        // case "FireOutlined": return <FireOutlined />;
         case "WifiOutlined": return <WifiOutlined />;
         default: return <AppstoreOutlined />;
     }
