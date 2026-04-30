@@ -97,16 +97,20 @@ const EditPermissionModal = ({ isOpen, onClose, user, onUpdated }) => {
   };
 
   const preloadFirstUserGroup = () => {
-    if (!user?.access || user.access.length === 0) return;
+    if (!Array.isArray(user?.access)) return;
 
-    const g = user.access[0];
+    const validGroup = user.access.find(
+      (g) => g && g.group_id && g.group_name
+    );
+
+    if (!validGroup) return;
 
     setSelectedGroup({
-      label: g.group_name,
-      value: g.group_id,
+      label: validGroup.group_name,
+      value: validGroup.group_id,
     });
 
-    fetchDevices(g.group_id, g.devices);
+    fetchDevices(validGroup.group_id, validGroup.devices || []);
   };
 
   const fetchDevices = async (
@@ -212,7 +216,9 @@ const EditPermissionModal = ({ isOpen, onClose, user, onUpdated }) => {
           <label>Group</label>
           <Select
             options={groupOptions}
-            value={selectedGroup}
+            value={
+              groupOptions.find((o) => o.value === selectedGroup?.value) || null
+            }
             onChange={onGroupChange}
             className="mb-4"
           />

@@ -7,6 +7,7 @@ import AddPermissionModal from "../components/AddPermissionModal";
 import EditPermissionModal from "../components/EditPermissionModal";
 import Loading from "../components/Loading";
 
+
 const DeviceAdministrationPage: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -23,11 +24,13 @@ const DeviceAdministrationPage: React.FC = () => {
 
       if (Array.isArray(data)) {
         const normalized = data.map((u, index) => ({
-          key: u.user_id,
+          key: u.user_id || index,
           sno: index + 1,
-          username: u.username,
-          email: u.email,
-          groups: u.access?.map((g) => g.group_name)?.join(", ") || "",
+          username: u.username || "",
+          email: u.email || "",
+          groups: Array.isArray(u.access)
+            ? u.access.map((g) => g?.group_name || "").join(", ")
+            : "",
           access: Array.isArray(u.access) ? u.access : [],
         }));
 
@@ -220,7 +223,11 @@ const DeviceAdministrationPage: React.FC = () => {
         <Table
           columns={columns}
           dataSource={users.filter((u) =>
-            [u.username, u.email, u.groups]
+            [
+              u.username || "",
+              u.email || "",
+              u.groups || "",
+            ]
               .join(" ")
               .toLowerCase()
               .includes(searchText.toLowerCase())

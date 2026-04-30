@@ -35,32 +35,32 @@ const MultiDeviceDashboardPage: React.FC = () => {
         let allDeviceIds: string[] = [];
 
         if (deviceCache[groupId]) {
-           allDeviceIds = deviceCache[groupId];
+          allDeviceIds = deviceCache[groupId];
         } else {
-           const res = await apiService.get(Endpoint.GROUP_DEVICES, {
-             id: groupId,
-           });
+          const res = await apiService.get(Endpoint.GROUP_DEVICES, {
+            id: groupId,
+          });
 
-           allDeviceIds = res?.data?.devices || [];
-           deviceCache[groupId] = allDeviceIds;
+          allDeviceIds = res?.data?.devices || [];
+          deviceCache[groupId] = allDeviceIds;
         }
 
         setAllDevicesList(allDeviceIds);
-        
+
         // Setup initial default selection (can be tweaked as needed)
         // For stationary/mobile logic originally there:
         let initialFilter = allDeviceIds;
         if (dashboardType?.includes("mobile")) {
-            initialFilter = allDeviceIds.filter(id => id.toUpperCase().startsWith("MOB"));
+          initialFilter = allDeviceIds.filter(id => id.toUpperCase().startsWith("MOB"));
         } else if (dashboardType?.includes("stationary")) {
-            // Optional: limit to non-mobile if you have specific stationary prefix, or just keep all
-            initialFilter = allDeviceIds.filter(id => !id.toUpperCase().startsWith("MOB"));
+          // Optional: limit to non-mobile if you have specific stationary prefix, or just keep all
+          initialFilter = allDeviceIds.filter(id => !id.toUpperCase().startsWith("MOB"));
         }
 
         // Default: limit to 10 so it doesn't break browser initially
         let initialSelection = initialFilter.slice(0, 10);
         if (dashboardType?.includes("single-device")) {
-            initialSelection = initialFilter.length > 0 ? [initialFilter[0]] : [];
+          initialSelection = initialFilter.length > 0 ? [initialFilter[0]] : [];
         }
         setSelectedDevices(initialSelection);
 
@@ -89,9 +89,9 @@ const MultiDeviceDashboardPage: React.FC = () => {
   // Handle Select Change
   const handleDeviceSelect = (opts: any) => {
     if (isSingleDevice) {
-       setSelectedDevices(opts ? [opts.value] : []);
+      setSelectedDevices(opts ? [opts.value] : []);
     } else {
-       setSelectedDevices(opts ? opts.map((opt: any) => opt.value) : []);
+      setSelectedDevices(opts ? opts.map((opt: any) => opt.value) : []);
     }
   };
 
@@ -117,14 +117,14 @@ const MultiDeviceDashboardPage: React.FC = () => {
     switch (dashboardType) {
       case "real-time-dashboard":
         return <RealTimeDashboardView groupId={groupId!} devices={selectedDevices} headerNode={headerNode} />;
-        
+
       case "single-device-dashboard":
       case "single-device-dashboard-v2":
         return <SingleDeviceDashboardView groupId={groupId!} devices={selectedDevices} headerNode={headerNode} />;
-        
+
       case "other-plots":
         return <DynamicChartBuilder devices={devicesForChart} storageKeyPattern={dashboardType} headerNode={headerNode} defaultChartType="scatter" />;
-        
+
       case "multi-device-dashboard-mobile-device":
       case "multi-device-dashboard-stationary-device":
       default:
@@ -149,45 +149,55 @@ const MultiDeviceDashboardPage: React.FC = () => {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-             {/* DEVICE SELECTOR TOP BAR */}
-             <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow border dark:border-gray-700 flex flex-col md:flex-row items-center gap-4">
-                <span className="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap pl-2">Select Devices</span>
-                <div className="w-full md:w-80">
-                   <Select
-                      isMulti={!isSingleDevice}
-                      options={deviceOptions}
-                      value={
-                          isSingleDevice 
-                            ? deviceOptions.find(d => selectedDevices[0] === d.value) 
-                            : deviceOptions.filter(d => selectedDevices.includes(d.value))
-                      }
-                      onChange={handleDeviceSelect}
-                      placeholder="Select Device(s)..."
-                      className="text-sm"
-                      hideSelectedOptions={false}
-                      components={!isSingleDevice ? {
-                        MultiValue: () => null,
-                        ValueContainer: ({ children, ...props }) => {
-                          const selectedCount = selectedDevices.length;
-                          let text = "Select Devices...";
-                          if (selectedCount === allDevicesList.length && allDevicesList.length > 0) {
-                            text = "All Devices Selected";
-                          } else if (selectedCount > 0) {
-                            text = `${selectedCount} Device(s) Selected`;
-                          }
-                          return (
-                            <div className="flex items-center px-2 text-gray-700 dark:text-gray-200">
-                              {text}
-                              {React.Children.toArray(children).find(child => (child as any)?.type === 'input')}
-                            </div>
-                          );
-                        }
-                      } : undefined}
-                   />
-                </div>
-             </div>
+            {/* DEVICE SELECTOR TOP BAR */}
+            <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow border dark:border-gray-700 flex flex-col md:flex-row items-center gap-4">
+              <span className="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap pl-2">Select Devices</span>
+              <div className="w-full md:w-80">
+                <Select
+                  isMulti={!isSingleDevice}
+                  options={deviceOptions}
+                  isSearchable={true}
+                  value={
+                    isSingleDevice
+                      ? deviceOptions.find(d => selectedDevices[0] === d.value)
+                      : deviceOptions.filter(d => selectedDevices.includes(d.value))
+                  }
+                  onChange={handleDeviceSelect}
+                  placeholder="Select Device(s)..."
+                  className="text-sm"
+                  hideSelectedOptions={false}
+                  components={!isSingleDevice ? {
+                    MultiValue: () => null,
+                    ValueContainer: (props) => {
+                      const { children } = props;
 
-             {renderDashboardView()}
+                      const selectedCount = selectedDevices.length;
+                      let text = "Select Devices...";
+
+                      if (selectedCount === allDevicesList.length && allDevicesList.length > 0) {
+                        text = "All Devices Selected";
+                      } else if (selectedCount > 0) {
+                        text = `${selectedCount} Device(s) Selected`;
+                      }
+
+                      return (
+                        <div className="flex items-center px-2 text-gray-700 dark:text-gray-200 w-full">
+                          {/* ✅ YOUR CUSTOM TEXT */}
+                          <span className="mr-2">{text}</span>
+
+                          {/* ✅ CRITICAL FIX → render ALL children properly */}
+                          <div className="flex-1">
+                            {children}
+                          </div>
+                        </div>
+                      );
+                    }
+                  } : undefined}
+                />
+              </div>
+            </div>
+
+            {renderDashboardView()}
           </div>
         )}
       </div>

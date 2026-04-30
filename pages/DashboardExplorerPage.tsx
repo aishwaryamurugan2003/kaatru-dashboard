@@ -17,7 +17,7 @@ const DashboardExplorerPage: React.FC = () => {
 
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("name");
-  const [view, setView] = useState<"grid" | "list">("grid"); // ✅ toggle state
+  const [view, setView] = useState<"grid" | "list">("grid");
 
   const navigate = useNavigate();
 
@@ -28,12 +28,24 @@ const DashboardExplorerPage: React.FC = () => {
         setError(null);
 
         const res = await apiService.get(Endpoint.GROUP_ALL);
-        const data = Array.isArray(res.data) ? res.data : res.data?.group || [];
+        const raw = res?.data;
+
+        let data: any[] = [];
+
+        if (Array.isArray(raw)) {
+          data = raw;
+        } else if (Array.isArray(raw?.group)) {
+          data = raw.group;
+        } else if (Array.isArray(raw?.data)) {
+          data = raw.data;
+        } else {
+          console.warn("Unexpected API response:", raw);
+          data = [];
+        }
 
         const filtered = data.filter(
-          (g: any) => g.status === 1 && g.id !== "NULL"
+          (g: any) => Number(g.status) === 1 && g.id && g.id !== "NULL"
         );
-
         setGroups(filtered);
         setFilteredGroups(filtered);
       } catch (err) {
@@ -53,12 +65,19 @@ const DashboardExplorerPage: React.FC = () => {
 
     if (search) {
       temp = temp.filter((g) =>
-        g.name.toLowerCase().includes(search.toLowerCase())
+        (g.name || g.group_name || "")
+          .toString()
+          .toLowerCase()
+          .includes(search.toLowerCase())
       );
     }
 
     if (sort === "name") {
-      temp.sort((a, b) => a.name.localeCompare(b.name));
+      temp.sort((a, b) =>
+        (a.name || a.group_name || "").localeCompare(
+          b.name || b.group_name || ""
+        )
+      );
     }
 
     setFilteredGroups(temp);
@@ -186,7 +205,7 @@ const DashboardExplorerPage: React.FC = () => {
                 </div>
 
                 <div className="font-semibold text-gray-800 dark:text-gray-100 truncate">
-                  {group.name}
+                  {group.name || group.group_name}
                 </div>
 
                 <div className="text-xs text-gray-500 mt-1 truncate">
@@ -207,7 +226,7 @@ const DashboardExplorerPage: React.FC = () => {
               >
                 <FolderOutlined className="text-blue-500 text-lg" />
                 <span className="font-medium text-gray-800 dark:text-gray-100">
-                  {group.name}
+                  {group.name || group.group_name}
                 </span>
               </div>
             ))}
