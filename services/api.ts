@@ -11,9 +11,11 @@ export const Endpoint = {
   GROUP_ALL: "https://bw04.kaatru.org/group/all",
   GROUP_DEVICES: "https://bw04.kaatru.org/group",
   ACCESS_MANAGEMENT: "https://caas.kaatru.org/admin/access-management",
-  ACCESS_MANAGEMENT_SYNC: "https://caas.kaatru.org/admin/access-management/sync",
+  ACCESS_MANAGEMENT_SYNC:
+    "https://caas.kaatru.org/admin/access-management/sync",
   DATA_DOWNLOAD: "http://bw02.kaatru.org/job/data/download",
 
+  SENSOR_HISTORY: "https://bw06.kaatru.org/stale/filter",
 
   // ✅ OTA ENDPOINTS
   OTA_UPLOAD_FIRMWARE: "/user/upload",
@@ -49,26 +51,38 @@ abstract class ApiService {
   abstract post(endpoint: string, payload: any): Promise<any>;
   abstract put(endpoint: string, payload: any): Promise<any>;
   abstract patch(endpoint: string, payload: any): Promise<any>;
-  abstract getRamanAnalysis(endpoint: string, payload?: Record<string, any>): Promise<any>;
+  abstract getRamanAnalysis(
+    endpoint: string,
+    payload?: Record<string, any>,
+  ): Promise<any>;
 
   abstract getUserFullAccess(userId: string): Promise<any[]>;
   abstract syncUserAccess(userId: string, access: any[]): Promise<any>;
 
-
-
   // ✅ OTA METHODS
-  abstract uploadFirmware(deviceId: string, deviceGroup: string, file: File): Promise<any>;
-  abstract setRunningVersion(deviceId: string, versionNumber: string): Promise<any>;
+  abstract uploadFirmware(
+    deviceId: string,
+    deviceGroup: string,
+    file: File,
+  ): Promise<any>;
+  abstract setRunningVersion(
+    deviceId: string,
+    versionNumber: string,
+  ): Promise<any>;
   abstract getRunningVersion(deviceId: string): Promise<any>;
   abstract getFirmwareFile(deviceId: string, version: string): Promise<any>;
   abstract updateRunningVersionAfterOTA(deviceId: string): Promise<any>;
 
+  abstract fetchSensorHistory(
+    deviceId: string,
+    filter: string
+  ): Promise<any>;
   abstract fetchDevices(): Promise<any[]>;
 
   abstract connectDeviceWebSocket(
     deviceId: string,
     mqttTopic: string,
-    onMessage: (data: any) => void
+    onMessage: (data: any) => void,
   ): void;
 
   abstract disconnectAllWebSockets(): void;
@@ -94,7 +108,7 @@ class Production extends ApiService {
     console.log("🌍 API HOST:", this.#host);
   }
 
-  setKeycloakToken(_: string) { }
+  setKeycloakToken(_: string) {}
 
   clearToken() {
     localStorage.removeItem("token");
@@ -107,9 +121,7 @@ class Production extends ApiService {
 
   #buildUrl(endpoint: string) {
     if (!endpoint) throw new Error("Endpoint is undefined");
-    return endpoint.startsWith("http")
-      ? endpoint
-      : `${this.#host}${endpoint}`;
+    return endpoint.startsWith("http") ? endpoint : `${this.#host}${endpoint}`;
   }
 
   async login(user: string, pwd: string) {
@@ -125,7 +137,6 @@ class Production extends ApiService {
     const token = localStorage.getItem("token");
     return isTokenAlive(token);
   }
-
 
   async get(endpoint: string, payload?: any) {
     const url = this.#buildUrl(endpoint);
@@ -160,7 +171,19 @@ class Production extends ApiService {
     return this.get(endpoint, payload);
   }
 
+  async fetchSensorHistory(deviceId: string, filter: string) {
+    const encodedId = encodeURIComponent(deviceId);
 
+    const res = await axios.get(Endpoint.SENSOR_HISTORY, {
+      params: {
+        devices: encodedId,
+        filter,
+      },
+      headers: this.#getHeaders(),
+    });
+
+    return res.data;
+  }
 
   /* ------------------------------------------------------------
      ✅ OTA API
@@ -181,7 +204,9 @@ class Production extends ApiService {
   }
 
   async setRunningVersion(deviceId: string, versionNumber: string) {
-    const url = this.#buildUrl(`${Endpoint.OTA_USER_RUNNING_VERSION}/${deviceId}`);
+    const url = this.#buildUrl(
+      `${Endpoint.OTA_USER_RUNNING_VERSION}/${deviceId}`,
+    );
     const res = await axios.post(url, null, {
       params: { version_number: versionNumber },
       headers: this.#getHeaders(),
@@ -190,16 +215,20 @@ class Production extends ApiService {
   }
 
   async getRunningVersion(deviceId: string) {
-    const url = this.#buildUrl(`${Endpoint.OTA_DEVICE_RUNNING_VERSION}/${deviceId}`);
+    const url = this.#buildUrl(
+      `${Endpoint.OTA_DEVICE_RUNNING_VERSION}/${deviceId}`,
+    );
     const res = await axios.get(url, { headers: this.#getHeaders() });
     return res.data;
   }
 
   async getFirmwareFile(deviceId: string, version: string) {
-    const url = this.#buildUrl(`${Endpoint.OTA_DEVICE_FIRMWARE_FILE}/${deviceId}/${version}`);
+    const url = this.#buildUrl(
+      `${Endpoint.OTA_DEVICE_FIRMWARE_FILE}/${deviceId}/${version}`,
+    );
     const res = await axios.get(url, {
       headers: this.#getHeaders(),
-      responseType: "blob"
+      responseType: "blob",
     });
     return res.data;
   }
@@ -248,7 +277,7 @@ class Production extends ApiService {
   connectDeviceWebSocket(
     deviceId: string,
     mqttTopic: string,
-    onMessage: (data: any) => void
+    onMessage: (data: any) => void,
   ) {
     if (this.#wsChannels[deviceId]) return;
 
@@ -310,7 +339,7 @@ class Production extends ApiService {
       },
       {
         headers: this.#getHeaders(),
-      }
+      },
     );
 
     return res.data;
@@ -321,8 +350,8 @@ class Production extends ApiService {
    MOCK API
 ------------------------------------------------------------ */
 class Mock extends ApiService {
-  clearToken() { }
-  setKeycloakToken() { }
+  clearToken() {}
+  setKeycloakToken() {}
   async isLoggedIn() {
     return true;
   }
@@ -343,12 +372,21 @@ class Mock extends ApiService {
     return {};
   }
 
-
-  async uploadFirmware() { return {}; }
-  async setRunningVersion() { return {}; }
-  async getRunningVersion() { return { running_version: "1.0.0" }; }
-  async getFirmwareFile() { return new Blob(["mock firmware"]); }
-  async updateRunningVersionAfterOTA() { return {}; }
+  async uploadFirmware() {
+    return {};
+  }
+  async setRunningVersion() {
+    return {};
+  }
+  async getRunningVersion() {
+    return { running_version: "1.0.0" };
+  }
+  async getFirmwareFile() {
+    return new Blob(["mock firmware"]);
+  }
+  async updateRunningVersionAfterOTA() {
+    return {};
+  }
 
   async getUserFullAccess() {
     return [];
@@ -363,8 +401,8 @@ class Mock extends ApiService {
     return { message: "Mock download success" };
   }
 
-  connectDeviceWebSocket() { }
-  disconnectAllWebSockets() { }
+  connectDeviceWebSocket() {}
+  disconnectAllWebSockets() {}
 }
 
 /* ------------------------------------------------------------
@@ -400,9 +438,7 @@ export async function fetchSensorData({
     timestamp_representation: "start",
   });
 
-  const res = await fetch(
-    `http://127.0.0.1:8001/v1/data?${params.toString()}`
-  );
+  const res = await fetch(`http://127.0.0.1:8001/v1/data?${params.toString()}`);
 
   return res.json();
 }
