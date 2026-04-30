@@ -74,13 +74,28 @@ const LoginPage: React.FC = () => {
   return (
     <div className="w-full h-screen flex bg-gray-100 font-inter">
 
-      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 items-center justify-center p-12">
-        <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border border-white/10 backdrop-blur">
+      <div className="hidden lg:flex w-3/4 bg-gradient-to-br flex flex-col gap-10 from-blue-600 to-blue-800 items-center justify-center p-12">
+      <p className="text-2xl text-white font-[600]">Kaatru Air Quality Operations Dashboard</p>
+        <div className="grid grid-cols-2 gap-4 w-full max-w-6xl">
 
           <img
-            src="/animations/image.png"
-            alt="Dashboard preview"
-            className="w-full h-auto object-cover"
+            src="/animations/img1.png"
+            className="rounded-xl shadow-lg object-fill w-full h-72"
+          />
+
+          <img
+            src="/animations/img2.png"
+            className="rounded-xl shadow-lg object-fill w-full h-72"
+          />
+
+          <img
+            src="/animations/img3.png"
+            className="rounded-xl shadow-lg object-fill w-full h-72"
+          />
+
+          <img
+            src="/animations/img4.png"
+            className="rounded-xl shadow-lg object-fill w-full h-72"
           />
 
         </div>

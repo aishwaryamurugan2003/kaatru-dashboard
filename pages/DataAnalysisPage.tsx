@@ -5,7 +5,7 @@ import DeviceSelector from "../components/DeviceSelector";
 import { apiService, Endpoint } from "../services/api";
 import axios from "axios";
 
-const ALL_DEVICES = ["MG53", "MG39", "MG57", "MG61"];
+const ALL_DEVICES = ["MG53", "MG39", "MG57", "MG61" , "MG67" , "MG60"];
 
 // Utility to format timestamp for datetime-local input
 const formatTimestampForInput = (timestamp: number): string => {
