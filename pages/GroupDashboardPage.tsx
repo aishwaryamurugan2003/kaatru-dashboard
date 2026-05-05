@@ -80,10 +80,12 @@ const GroupDashboardPage: React.FC = () => {
   /* ------------------------------------------------------------
      ✅ DEVICE CLASSIFICATION
   ------------------------------------------------------------ */
-  const stationaryDevices = devices; // ✅ no filtering (recommended)
-
   const mobileDevices = devices.filter((d) =>
-    d.toUpperCase().startsWith("MOB")
+    d.toUpperCase().startsWith("MOB") || d.toUpperCase().startsWith("MG") || d.toUpperCase().startsWith("LMG")
+  );
+
+  const stationaryDevices = devices.filter((d) =>
+    d.toUpperCase().startsWith("SG") || (!d.toUpperCase().startsWith("MOB") && !d.toUpperCase().startsWith("MG") && !d.toUpperCase().startsWith("LMG"))
   );
 
   /* ------------------------------------------------------------

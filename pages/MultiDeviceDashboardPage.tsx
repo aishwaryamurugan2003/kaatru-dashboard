@@ -45,17 +45,18 @@ const MultiDeviceDashboardPage: React.FC = () => {
           deviceCache[groupId] = allDeviceIds;
         }
 
-        setAllDevicesList(allDeviceIds);
+
 
         // Setup initial default selection (can be tweaked as needed)
         // For stationary/mobile logic originally there:
         let initialFilter = allDeviceIds;
         if (dashboardType?.includes("mobile")) {
-          initialFilter = allDeviceIds.filter(id => id.toUpperCase().startsWith("MOB"));
+          initialFilter = allDeviceIds.filter(id => id.toUpperCase().startsWith("MOB") || id.toUpperCase().startsWith("MG") || id.toUpperCase().startsWith("LMG"));
         } else if (dashboardType?.includes("stationary")) {
-          // Optional: limit to non-mobile if you have specific stationary prefix, or just keep all
-          initialFilter = allDeviceIds.filter(id => !id.toUpperCase().startsWith("MOB"));
+          initialFilter = allDeviceIds.filter(id => id.toUpperCase().startsWith("SG") || (!id.toUpperCase().startsWith("MOB") && !id.toUpperCase().startsWith("MG") && !id.toUpperCase().startsWith("LMG")));
         }
+
+        setAllDevicesList(initialFilter);
 
         // Default: limit to 10 so it doesn't break browser initially
         let initialSelection = initialFilter.slice(0, 10);
@@ -80,18 +81,26 @@ const MultiDeviceDashboardPage: React.FC = () => {
     : "Dashboard";
 
   // Prepare options for Select
-  const deviceOptions = useMemo(() => {
-    return allDevicesList.map(id => ({ label: id, value: id }));
-  }, [allDevicesList]);
-
   const isSingleDevice = dashboardType?.includes("single-device");
+
+  const deviceOptions = useMemo(() => {
+    const opts = allDevicesList.map(id => ({ label: id, value: id }));
+    if (!isSingleDevice && opts.length > 0) {
+      return [{ label: "Select All", value: "SELECT_ALL" }, ...opts];
+    }
+    return opts;
+  }, [allDevicesList, isSingleDevice]);
 
   // Handle Select Change
   const handleDeviceSelect = (opts: any) => {
     if (isSingleDevice) {
       setSelectedDevices(opts ? [opts.value] : []);
     } else {
-      setSelectedDevices(opts ? opts.map((opt: any) => opt.value) : []);
+      if (opts && opts.some((o: any) => o.value === "SELECT_ALL")) {
+        setSelectedDevices(allDevicesList);
+      } else {
+        setSelectedDevices(opts ? opts.map((opt: any) => opt.value) : []);
+      }
     }
   };
 
@@ -172,7 +181,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
                       const { children } = props;
 
                       const selectedCount = selectedDevices.length;
-                      let text = "Select Devices...";
+                      let text = "";
 
                       if (selectedCount === allDevicesList.length && allDevicesList.length > 0) {
                         text = "All Devices Selected";
@@ -182,10 +191,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
 
                       return (
                         <div className="flex items-center px-2 text-gray-700 dark:text-gray-200 w-full">
-                          {/* ✅ YOUR CUSTOM TEXT */}
-                          <span className="mr-2">{text}</span>
-
-                          {/* ✅ CRITICAL FIX → render ALL children properly */}
+                          {text && <span className="mr-2 font-medium">{text}</span>}
                           <div className="flex-1">
                             {children}
                           </div>
