@@ -19,12 +19,19 @@ const fields = [
 
 interface DynamicChartBuilderProps {
     devices: any[];
-    storageKeyPattern: string; // E.g. "dashboard_stationary" so they are isolated per dashboard
-    headerNode?: React.ReactNode; // Content to display on the left side of the top bar
+    storageKeyPattern: string;
+    headerNode?: React.ReactNode;
     defaultChartType?: "line" | "bar" | "pie" | "scatter" | "composed" | "radar";
+    measurement?: string; // ✅ dynamic per group
 }
 
-export default function DynamicChartBuilder({ devices, storageKeyPattern, headerNode, defaultChartType = "line" }: DynamicChartBuilderProps) {
+export default function DynamicChartBuilder({
+    devices,
+    storageKeyPattern,
+    headerNode,
+    defaultChartType = "line",
+    measurement = "gurprod", // ✅ default fallback
+}: DynamicChartBuilderProps) {
     const STORAGE_KEY = `charts_${window.location.pathname}_${storageKeyPattern}`;
 
     const [charts, setCharts] = useState<ChartConfig[]>([]);
@@ -38,9 +45,8 @@ export default function DynamicChartBuilder({ devices, storageKeyPattern, header
         try {
             const saved = localStorage.getItem(STORAGE_KEY);
             let parsed = saved ? JSON.parse(saved) : [];
-            
+
             if (parsed.length === 0) {
-                // DEFAULT MULTIPLE CHARTS
                 parsed = [
                     "sPM2",
                     "sPM10",
@@ -50,7 +56,7 @@ export default function DynamicChartBuilder({ devices, storageKeyPattern, header
                 ].map((param) => ({
                     id: param,
                     type: defaultChartType,
-                    xKey: defaultChartType === "scatter" ? "rh" : "srvtime", // scatter typically needs two numeric bounds, fallback to rh 
+                    xKey: defaultChartType === "scatter" ? "rh" : "srvtime",
                     yKey: param,
                     x: 0,
                     y: 0,
@@ -66,7 +72,6 @@ export default function DynamicChartBuilder({ devices, storageKeyPattern, header
 
     useEffect(() => {
         try {
-            // Only save if we actually have charts, unless we explicitly cleared them
             if (charts.length > 0) {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(charts));
             }
@@ -119,13 +124,11 @@ export default function DynamicChartBuilder({ devices, storageKeyPattern, header
         <div className="flex flex-col gap-6 w-full h-full">
             {/* ---------------- HEADER & ADD CHART BUTTONS ---------------- */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                
-                {/* 1. Left side: Passed from Parent (Title, etc) */}
+
                 <div className="flex-1">
                     {headerNode && headerNode}
                 </div>
 
-                {/* 2. Right side: "+ Add Chart" / "Reset Charts" */}
                 <div className="flex gap-3 shrink-0">
                     <button
                         className="bg-blue-600 hover:bg-blue-700 transition-colors text-white px-4 py-2 rounded-lg font-medium shadow-sm"
@@ -206,7 +209,8 @@ export default function DynamicChartBuilder({ devices, storageKeyPattern, header
                         <h2 className="text-md font-semibold mb-2 text-gray-700 dark:text-gray-200 uppercase">
                             {chart.yKey}
                         </h2>
-                        <RenderChart config={chart} devices={devices} />
+                        {/* ✅ Pass measurement down to RenderChart */}
+                        <RenderChart config={chart} devices={devices} measurement={measurement} />
                     </div>
                 ))}
                 {charts.length === 0 && (

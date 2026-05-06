@@ -10,8 +10,19 @@ const DASHBOARD_TYPES = [
   "Other Plots",
   "Real Time Dashboard",
   "Single Device Dashboard",
-  "Single Device Dashboard V2"
+  "Single Device Dashboard V2",
 ];
+
+// Mobile: MOB*, MG* only
+// Stationary: everything else (LMG*, SG*, etc.)
+function isMobileDevice(id: string): boolean {
+  const upper = id.toUpperCase();
+  return upper.startsWith("MOB") || upper.startsWith("MG");
+}
+
+function isStationaryDevice(id: string): boolean {
+  return !isMobileDevice(id);
+}
 
 const GroupDashboardPage: React.FC = () => {
   const { groupId } = useParams<{ groupId: string }>();
@@ -22,12 +33,10 @@ const GroupDashboardPage: React.FC = () => {
     location.state?.groupName || groupId || "Group"
   );
   const [loading, setLoading] = useState(!location.state?.groupName);
-
-  // ✅ NEW STATE
   const [devices, setDevices] = useState<string[]>([]);
 
   /* ------------------------------------------------------------
-     FETCH GROUP NAME (existing logic)
+     FETCH GROUP NAME
   ------------------------------------------------------------ */
   useEffect(() => {
     if (!location.state?.groupName) {
@@ -54,7 +63,7 @@ const GroupDashboardPage: React.FC = () => {
   }, [groupId, location.state]);
 
   /* ------------------------------------------------------------
-     ✅ FETCH DEVICES USING YOUR API
+     FETCH DEVICES
   ------------------------------------------------------------ */
   useEffect(() => {
     const fetchDevices = async () => {
@@ -62,12 +71,7 @@ const GroupDashboardPage: React.FC = () => {
         const res = await apiService.get(Endpoint.GROUP_DEVICES, {
           id: groupId,
         });
-
-        const data = res.data;
-
-        // ✅ SAFE PARSE
-        const deviceList = data?.devices || [];
-
+        const deviceList = res.data?.devices || [];
         setDevices(deviceList);
       } catch (err) {
         console.error("❌ Failed to fetch devices", err);
@@ -78,18 +82,13 @@ const GroupDashboardPage: React.FC = () => {
   }, [groupId]);
 
   /* ------------------------------------------------------------
-     ✅ DEVICE CLASSIFICATION
+     DEVICE CLASSIFICATION
   ------------------------------------------------------------ */
-  const mobileDevices = devices.filter((d) =>
-    d.toUpperCase().startsWith("MOB") || d.toUpperCase().startsWith("MG") || d.toUpperCase().startsWith("LMG")
-  );
-
-  const stationaryDevices = devices.filter((d) =>
-    d.toUpperCase().startsWith("SG") || (!d.toUpperCase().startsWith("MOB") && !d.toUpperCase().startsWith("MG") && !d.toUpperCase().startsWith("LMG"))
-  );
+  const mobileDevices = devices.filter(isMobileDevice);
+  const stationaryDevices = devices.filter(isStationaryDevice);
 
   /* ------------------------------------------------------------
-     ✅ NAVIGATION WITH DEVICES
+     NAVIGATION
   ------------------------------------------------------------ */
   const handleDashboardClick = (dashboardName: string) => {
     const urlFormat = dashboardName.toLowerCase().replace(/\s+/g, "-");

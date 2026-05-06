@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiService, Endpoint } from "../services/api";
-import { RenderChart, ChartConfig } from "../components/RenderChart";
 import DynamicChartBuilder from "../components/DynamicChartBuilder";
 import RealTimeDashboardView from "../components/dashboards/RealTimeDashboardView";
 import SingleDeviceDashboardView from "../components/dashboards/SingleDeviceDashboardView";
@@ -10,7 +9,35 @@ import Select from "react-select";
 
 // Cache to avoid refetch
 const deviceCache: Record<string, string[]> = {};
+const measurementCache: Record<string, string> = {};
 
+// Junk/placeholder values the API sometimes returns — treat these as "no value"
+const INVALID_DB_VALUES = new Set([
+  "string", "null", "NULL", "", "admin", "NR1", "NR2",
+]);
+
+// Mobile: MOB*, MG* only
+// Stationary: everything else (LMG*, SG*, etc.)
+function isMobileDevice(id: string): boolean {
+  const upper = id.toUpperCase();
+  return upper.startsWith("MOB") || upper.startsWith("MG");
+}
+
+function isStationaryDevice(id: string): boolean {
+  return !isMobileDevice(id);
+}
+function resolveMeasurement(groupInfo: any): string {
+  if (!groupInfo) return "sendata";
+
+  const primary = groupInfo.primarydb?.toLowerCase();
+
+  // ✅ TRUST ONLY primarydb (your backend truth)
+  if (primary && primary !== "string") {
+    return primary;
+  }
+
+  return "sendata";
+}
 const MultiDeviceDashboardPage: React.FC = () => {
   const { groupId, dashboardType } = useParams<{
     groupId: string;
@@ -21,6 +48,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
 
   const [allDevicesList, setAllDevicesList] = useState<string[]>([]);
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+  const [measurement, setMeasurement] = useState<string>("sendata");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,27 +61,37 @@ const MultiDeviceDashboardPage: React.FC = () => {
         setError(null);
 
         let allDeviceIds: string[] = [];
+        let resolvedMeasurement = "sendata";
 
+        // ── Devices ──────────────────────────────────────────
         if (deviceCache[groupId]) {
           allDeviceIds = deviceCache[groupId];
+          resolvedMeasurement = measurementCache[groupId] ?? "sendata";
         } else {
           const res = await apiService.get(Endpoint.GROUP_DEVICES, {
             id: groupId,
           });
-
           allDeviceIds = res?.data?.devices || [];
           deviceCache[groupId] = allDeviceIds;
+
+          // ── Measurement: read from group info ──
+          const groupInfo = res?.data?.group?.[0];
+          resolvedMeasurement = resolveMeasurement(groupInfo);
+          measurementCache[groupId] = resolvedMeasurement;
+
+          console.log(
+            `📦 Group "${groupId}" | db="${groupInfo?.db}" | primarydb="${groupInfo?.primarydb}" | ✅ resolved="${resolvedMeasurement}"`
+          );
         }
 
+        setMeasurement(resolvedMeasurement);
 
-
-        // Setup initial default selection (can be tweaked as needed)
-        // For stationary/mobile logic originally there:
+        // ── Filter by dashboard type ──────────────────────────
         let initialFilter = allDeviceIds;
         if (dashboardType?.includes("mobile")) {
-          initialFilter = allDeviceIds.filter(id => id.toUpperCase().startsWith("MOB") || id.toUpperCase().startsWith("MG") || id.toUpperCase().startsWith("LMG"));
+          initialFilter = allDeviceIds.filter(isMobileDevice);
         } else if (dashboardType?.includes("stationary")) {
-          initialFilter = allDeviceIds.filter(id => id.toUpperCase().startsWith("SG") || (!id.toUpperCase().startsWith("MOB") && !id.toUpperCase().startsWith("MG") && !id.toUpperCase().startsWith("LMG")));
+          initialFilter = allDeviceIds.filter(isStationaryDevice);
         }
 
         setAllDevicesList(initialFilter);
@@ -77,21 +115,19 @@ const MultiDeviceDashboardPage: React.FC = () => {
   }, [groupId, dashboardType]);
 
   const pageTitle = dashboardType
-    ? dashboardType.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    ? dashboardType.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     : "Dashboard";
 
-  // Prepare options for Select
   const isSingleDevice = dashboardType?.includes("single-device");
 
   const deviceOptions = useMemo(() => {
-    const opts = allDevicesList.map(id => ({ label: id, value: id }));
+    const opts = allDevicesList.map((id) => ({ label: id, value: id }));
     if (!isSingleDevice && opts.length > 0) {
       return [{ label: "Select All", value: "SELECT_ALL" }, ...opts];
     }
     return opts;
   }, [allDevicesList, isSingleDevice]);
 
-  // Handle Select Change
   const handleDeviceSelect = (opts: any) => {
     if (isSingleDevice) {
       setSelectedDevices(opts ? [opts.value] : []);
@@ -119,25 +155,52 @@ const MultiDeviceDashboardPage: React.FC = () => {
     </div>
   );
 
-  const devicesForChart = selectedDevices.map(id => ({ label: id, value: id }));
+  const devicesForChart = selectedDevices.map((id) => ({ label: id, value: id }));
 
-  // Render different views based on dashboardType
   const renderDashboardView = () => {
     switch (dashboardType) {
       case "real-time-dashboard":
-        return <RealTimeDashboardView groupId={groupId!} devices={selectedDevices} headerNode={headerNode} />;
+        return (
+          <RealTimeDashboardView
+            groupId={groupId!}
+            devices={selectedDevices}
+            headerNode={headerNode}
+          />
+        );
 
       case "single-device-dashboard":
       case "single-device-dashboard-v2":
-        return <SingleDeviceDashboardView groupId={groupId!} devices={selectedDevices} headerNode={headerNode} />;
+        return (
+          <SingleDeviceDashboardView
+            groupId={groupId!}
+            devices={selectedDevices}
+            headerNode={headerNode}
+          />
+        );
 
       case "other-plots":
-        return <DynamicChartBuilder devices={devicesForChart} storageKeyPattern={dashboardType} headerNode={headerNode} defaultChartType="scatter" />;
+        return (
+          <DynamicChartBuilder
+            devices={devicesForChart}
+            storageKeyPattern={dashboardType}
+            headerNode={headerNode}
+            defaultChartType="scatter"
+            measurement={measurement}
+          />
+        );
 
       case "multi-device-dashboard-mobile-device":
       case "multi-device-dashboard-stationary-device":
       default:
-        return <DynamicChartBuilder devices={devicesForChart} storageKeyPattern={dashboardType || "unknown"} headerNode={headerNode} defaultChartType="line" />;
+        return (
+          <DynamicChartBuilder
+            devices={devicesForChart}
+            storageKeyPattern={dashboardType || "unknown"}
+            headerNode={headerNode}
+            defaultChartType="line"
+            measurement={measurement}
+          />
+        );
     }
   };
 
@@ -160,7 +223,9 @@ const MultiDeviceDashboardPage: React.FC = () => {
           <div className="flex flex-col gap-4">
             {/* DEVICE SELECTOR TOP BAR */}
             <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow border dark:border-gray-700 flex flex-col md:flex-row items-center gap-4">
-              <span className="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap pl-2">Select Devices</span>
+              <span className="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap pl-2">
+                Select Devices
+              </span>
               <div className="w-full md:w-80">
                 <Select
                   isMulti={!isSingleDevice}
@@ -168,37 +233,43 @@ const MultiDeviceDashboardPage: React.FC = () => {
                   isSearchable={true}
                   value={
                     isSingleDevice
-                      ? deviceOptions.find(d => selectedDevices[0] === d.value)
-                      : deviceOptions.filter(d => selectedDevices.includes(d.value))
+                      ? deviceOptions.find((d) => selectedDevices[0] === d.value)
+                      : deviceOptions.filter((d) => selectedDevices.includes(d.value))
                   }
                   onChange={handleDeviceSelect}
                   placeholder="Select Device(s)..."
                   className="text-sm"
                   hideSelectedOptions={false}
-                  components={!isSingleDevice ? {
-                    MultiValue: () => null,
-                    ValueContainer: (props) => {
-                      const { children } = props;
+                  components={
+                    !isSingleDevice
+                      ? {
+                        MultiValue: () => null,
+                        ValueContainer: (props) => {
+                          const { children } = props;
+                          const selectedCount = selectedDevices.length;
+                          let text = "";
 
-                      const selectedCount = selectedDevices.length;
-                      let text = "";
+                          if (
+                            selectedCount === allDevicesList.length &&
+                            allDevicesList.length > 0
+                          ) {
+                            text = "All Devices Selected";
+                          } else if (selectedCount > 0) {
+                            text = `${selectedCount} Device(s) Selected`;
+                          }
 
-                      if (selectedCount === allDevicesList.length && allDevicesList.length > 0) {
-                        text = "All Devices Selected";
-                      } else if (selectedCount > 0) {
-                        text = `${selectedCount} Device(s) Selected`;
+                          return (
+                            <div className="flex items-center px-2 text-gray-700 dark:text-gray-200 w-full">
+                              {text && (
+                                <span className="mr-2 font-medium">{text}</span>
+                              )}
+                              <div className="flex-1">{children}</div>
+                            </div>
+                          );
+                        },
                       }
-
-                      return (
-                        <div className="flex items-center px-2 text-gray-700 dark:text-gray-200 w-full">
-                          {text && <span className="mr-2 font-medium">{text}</span>}
-                          <div className="flex-1">
-                            {children}
-                          </div>
-                        </div>
-                      );
-                    }
-                  } : undefined}
+                      : undefined
+                  }
                 />
               </div>
             </div>

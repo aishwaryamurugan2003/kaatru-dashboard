@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
-  LineChart, Line,
   BarChart, Bar,
   PieChart, Pie, Cell,
   RadarChart, Radar,
@@ -9,7 +8,8 @@ import {
   AreaChart, Area, ReferenceArea,
   XAxis, YAxis, Tooltip, CartesianGrid, Legend,
   PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  ResponsiveContainer
+  ResponsiveContainer,
+  Line,
 } from "recharts";
 import { fetchSensorData, convertToTimeSeries } from "../services/api";
 
@@ -35,35 +35,29 @@ const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 export function RenderChart({
   config,
   devices,
+  measurement = "gurprod", // ✅ dynamic per group
 }: {
   config: ChartConfig;
   devices: any[];
+  measurement?: string;
 }) {
-  const { type, xKey, yKey } = config;
+  const { type, yKey } = config;
 
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Legend isolation state
   const [isolatedDevice, setIsolatedDevice] = useState<string | null>(null);
-
   const handleLegendClick = (e: any) => {
-    const clickedItem = e.value;
-    setIsolatedDevice((prev) => (prev === clickedItem ? null : clickedItem));
+    setIsolatedDevice((prev) => (prev === e.value ? null : e.value));
   };
 
-  // Zoom specific state
   const [refAreaLeft, setRefAreaLeft] = useState<string | number | undefined>(undefined);
   const [refAreaRight, setRefAreaRight] = useState<string | number | undefined>(undefined);
   const [zoomLeft, setZoomLeft] = useState<string | number>("dataMin");
   const [zoomRight, setZoomRight] = useState<string | number>("dataMax");
 
-  const handleMouseDown = (e: any) => {
-    if (e && e.activeLabel) setRefAreaLeft(e.activeLabel);
-  };
-  const handleMouseMove = (e: any) => {
-    if (refAreaLeft && e && e.activeLabel) setRefAreaRight(e.activeLabel);
-  };
+  const handleMouseDown = (e: any) => { if (e?.activeLabel) setRefAreaLeft(e.activeLabel); };
+  const handleMouseMove = (e: any) => { if (refAreaLeft && e?.activeLabel) setRefAreaRight(e.activeLabel); };
   const handleMouseUp = () => {
     if (refAreaLeft && refAreaRight && refAreaLeft !== refAreaRight) {
       const [min, max] = [refAreaLeft, refAreaRight].sort((a, b) => Number(a) - Number(b));
@@ -77,37 +71,40 @@ export function RenderChart({
     setZoomLeft("dataMin");
     setZoomRight("dataMax");
   };
+
+  // ✅ Stable dependency: stringify devices + yKey + measurement to avoid infinite re-renders
+  const deviceKey = devices.map((d) => d.value).join(",");
+
   useEffect(() => {
     async function load() {
       if (!yKey || yKey === "device" || devices.length === 0) return;
 
       setLoading(true);
-
       try {
         const deviceIds = devices.map((d: any) => d.value);
 
         const apiResponse = await fetchSensorData({
           deviceIds,
           fields: yKey,
+          measurement, // ✅ pass dynamic measurement
         });
 
         const allData = convertToTimeSeries(apiResponse, yKey);
-
-        console.log("FINAL CHART DATA:", allData);
+        console.log(`CHART [${yKey}] measurement=${measurement} → ${allData.length} points`);
         setData(allData);
       } catch (e) {
         console.error("CRITICAL API ERROR", e);
       }
-
       setLoading(false);
     }
 
     load();
-  }, [yKey, devices]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yKey, deviceKey, measurement]); // ✅ use stable string keys
 
   if (!devices.length) {
     return (
-      <div className="h-[300px] flex items-center justify-center text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="h-[300px] flex items-center justify-center text-gray-500 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
         Select device(s)
       </div>
     );
@@ -115,7 +112,7 @@ export function RenderChart({
 
   if (loading) {
     return (
-      <div className="h-[300px] flex items-center justify-center text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100 p-4 animate-pulse">
+      <div className="h-[300px] flex items-center justify-center text-gray-500 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 animate-pulse">
         Loading...
       </div>
     );
@@ -123,14 +120,14 @@ export function RenderChart({
 
   if (!data.length) {
     return (
-      <div className="flex items-center justify-center h-[300px] text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="flex items-center justify-center h-[300px] text-gray-500 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
         No data available
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 h-[320px] relative transition-all duration-200 hover:shadow-md">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 h-[320px] relative transition-all duration-200 hover:shadow-md">
       {zoomLeft !== "dataMin" && (
         <button
           className="absolute top-2 right-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-1 text-xs rounded border border-blue-200 transition-colors z-10 shadow-sm font-semibold"
@@ -141,6 +138,7 @@ export function RenderChart({
       )}
       <ResponsiveContainer width="100%" height={300}>
         <>
+          {/* ---------------- LINE / AREA ---------------- */}
           {type === "line" && (
             <AreaChart
               data={data}
@@ -162,27 +160,27 @@ export function RenderChart({
                 type="number"
                 domain={[zoomLeft, zoomRight]}
                 allowDataOverflow
-                tickFormatter={(value) => formatTime(value)}
-                tick={{ fill: '#6b7280', fontSize: 12 }}
+                tickFormatter={formatTime}
+                tick={{ fill: "#6b7280", fontSize: 12 }}
                 tickMargin={10}
-                axisLine={{ stroke: '#e5e7eb' }}
-                tickLine={{ stroke: '#e5e7eb' }}
+                axisLine={{ stroke: "#e5e7eb" }}
+                tickLine={{ stroke: "#e5e7eb" }}
               />
               <YAxis
-                domain={['auto', 'auto']}
+                domain={["auto", "auto"]}
                 tickCount={6}
                 tickFormatter={(val) => Math.round(val).toString()}
-                tick={{ fill: '#6b7280', fontSize: 12 }}
+                tick={{ fill: "#6b7280", fontSize: 12 }}
                 tickMargin={10}
-                axisLine={{ stroke: '#e5e7eb' }}
-                tickLine={{ stroke: '#e5e7eb' }}
+                axisLine={{ stroke: "#e5e7eb" }}
+                tickLine={{ stroke: "#e5e7eb" }}
               />
               <Tooltip
-                labelFormatter={(value) => formatTime(value)}
+                labelFormatter={formatTime}
                 formatter={(value: number) => value.toFixed(2)}
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
+                contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
               />
-              <Legend wrapperStyle={{ paddingTop: '10px', cursor: 'pointer' }} onClick={handleLegendClick} />
+              <Legend wrapperStyle={{ paddingTop: "10px", cursor: "pointer" }} onClick={handleLegendClick} />
               {devices.map((d, index) => (
                 <Area
                   hide={isolatedDevice !== null && isolatedDevice !== d.label}
@@ -197,13 +195,13 @@ export function RenderChart({
                   connectNulls
                 />
               ))}
-              {refAreaLeft && refAreaRight ? (
+              {refAreaLeft && refAreaRight && (
                 <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#3b82f6" fillOpacity={0.1} />
-              ) : null}
+              )}
             </AreaChart>
           )}
 
-          {/* ---------------- BAR CHART ---------------- */}
+          {/* ---------------- BAR ---------------- */}
           {type === "bar" && (
             <BarChart
               data={data}
@@ -217,23 +215,23 @@ export function RenderChart({
                 type="number"
                 domain={[zoomLeft, zoomRight]}
                 allowDataOverflow
-                tickFormatter={(value) => formatTime(value)}
-                tick={{ fill: '#6b7280', fontSize: 12 }}
-                axisLine={{ stroke: '#e5e7eb' }}
+                tickFormatter={formatTime}
+                tick={{ fill: "#6b7280", fontSize: 12 }}
+                axisLine={{ stroke: "#e5e7eb" }}
               />
               <YAxis
-                domain={['auto', 'auto']}
+                domain={["auto", "auto"]}
                 tickCount={6}
-                tick={{ fill: '#6b7280', fontSize: 12 }}
-                axisLine={{ stroke: '#e5e7eb' }}
+                tick={{ fill: "#6b7280", fontSize: 12 }}
+                axisLine={{ stroke: "#e5e7eb" }}
               />
               <Tooltip
-                labelFormatter={(value) => formatTime(value)}
+                labelFormatter={formatTime}
                 formatter={(value: number) => value.toFixed(2)}
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb" }}
               />
-              <Legend wrapperStyle={{ cursor: 'pointer' }} onClick={handleLegendClick} />
-              {devices.length > 0 ? devices.map((d, index) => (
+              <Legend wrapperStyle={{ cursor: "pointer" }} onClick={handleLegendClick} />
+              {devices.map((d, index) => (
                 <Bar
                   hide={isolatedDevice !== null && isolatedDevice !== d.label}
                   key={d.value}
@@ -242,28 +240,23 @@ export function RenderChart({
                   name={d.label}
                   radius={[4, 4, 0, 0]}
                 />
-              )) : (
-                <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} />
-              )}
-              {refAreaLeft && refAreaRight ? (
+              ))}
+              {refAreaLeft && refAreaRight && (
                 <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#3b82f6" fillOpacity={0.1} />
-              ) : null}
+              )}
             </BarChart>
           )}
 
-          {/* ---------------- PIE CHART ---------------- */}
+          {/* ---------------- PIE ---------------- */}
           {type === "pie" && (
             <PieChart>
               <Tooltip
                 formatter={(value: number) => value.toFixed(2)}
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb" }}
               />
               <Legend verticalAlign="bottom" />
               <Pie
-                data={data.map((d, i) => ({
-                  name: formatTime(d.srvtime),
-                  value: d.value,
-                }))}
+                data={data.map((d) => ({ name: formatTime(d.srvtime), value: d.value }))}
                 dataKey="value"
                 nameKey="name"
                 cx="50%"
@@ -292,36 +285,34 @@ export function RenderChart({
                 type="number"
                 domain={[zoomLeft, zoomRight]}
                 allowDataOverflow
-                tickFormatter={(value) => formatTime(value)}
-                tick={{ fill: '#6b7280', fontSize: 12 }}
+                tickFormatter={formatTime}
+                tick={{ fill: "#6b7280", fontSize: 12 }}
               />
               <YAxis
                 dataKey={(entry) => entry.value || 0}
-                domain={['auto', 'auto']}
+                domain={["auto", "auto"]}
                 tickCount={6}
-                tick={{ fill: '#6b7280', fontSize: 12 }}
+                tick={{ fill: "#6b7280", fontSize: 12 }}
               />
               <Tooltip
-                labelFormatter={(value) => formatTime(value)}
-                formatter={(value: number) => typeof value === 'number' ? value.toFixed(2) : value}
-                cursor={{ strokeDasharray: '3 3' }}
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                labelFormatter={formatTime}
+                formatter={(value: number) => typeof value === "number" ? value.toFixed(2) : value}
+                cursor={{ strokeDasharray: "3 3" }}
+                contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb" }}
               />
-              <Legend wrapperStyle={{ cursor: 'pointer' }} onClick={handleLegendClick} />
-              {devices.length > 0 ? devices.map((d, index) => (
+              <Legend wrapperStyle={{ cursor: "pointer" }} onClick={handleLegendClick} />
+              {devices.map((d, index) => (
                 <Scatter
                   hide={isolatedDevice !== null && isolatedDevice !== d.label}
                   key={d.value}
                   name={d.label}
-                  data={data.filter(entry => entry.device === d.value)}
+                  data={data.filter((entry) => entry.device === d.value)}
                   fill={COLORS[index % COLORS.length]}
                 />
-              )) : (
-                <Scatter data={data} fill="#f59e0b" />
-              )}
-              {refAreaLeft && refAreaRight ? (
+              ))}
+              {refAreaLeft && refAreaRight && (
                 <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#3b82f6" fillOpacity={0.1} />
-              ) : null}
+              )}
             </ScatterChart>
           )}
 
@@ -339,42 +330,39 @@ export function RenderChart({
                 type="number"
                 domain={[zoomLeft, zoomRight]}
                 allowDataOverflow
-                tickFormatter={(value) => formatTime(value)}
-                tick={{ fill: '#6b7280', fontSize: 12 }}
+                tickFormatter={formatTime}
+                tick={{ fill: "#6b7280", fontSize: 12 }}
               />
               <YAxis
-                domain={['auto', 'auto']}
+                domain={["auto", "auto"]}
                 tickCount={6}
-                tick={{ fill: '#6b7280', fontSize: 12 }}
+                tick={{ fill: "#6b7280", fontSize: 12 }}
               />
               <Tooltip
-                labelFormatter={(value) => formatTime(value)}
+                labelFormatter={formatTime}
                 formatter={(value: number) => value.toFixed(2)}
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb" }}
               />
               <Legend />
               <Bar dataKey={(entry) => entry.value || 0} fill="#10b981" radius={[4, 4, 0, 0]} />
               <Line type="monotone" dataKey={(entry) => entry.value || 0} stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
-              {refAreaLeft && refAreaRight ? (
+              {refAreaLeft && refAreaRight && (
                 <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#3b82f6" fillOpacity={0.1} />
-              ) : null}
+              )}
             </ComposedChart>
           )}
 
           {/* ---------------- RADAR ---------------- */}
           {type === "radar" && (
             <RadarChart
-              data={data.map((d) => ({
-                time: formatTime(d.srvtime),
-                value: d.value,
-              }))}
+              data={data.map((d) => ({ time: formatTime(d.srvtime), value: d.value }))}
             >
               <PolarGrid stroke="#e5e7eb" />
-              <PolarAngleAxis dataKey="time" tick={{ fill: '#6b7280', fontSize: 12 }} />
+              <PolarAngleAxis dataKey="time" tick={{ fill: "#6b7280", fontSize: 12 }} />
               <PolarRadiusAxis />
               <Tooltip
                 formatter={(value: number) => value.toFixed(2)}
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb" }}
               />
               <Radar dataKey="value" stroke="#3b82f6" strokeWidth={2} fill="#3b82f6" fillOpacity={0.3} />
               <Legend />
