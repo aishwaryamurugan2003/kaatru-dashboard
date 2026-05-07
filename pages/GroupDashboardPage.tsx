@@ -25,8 +25,23 @@ interface CustomFolder {
 const STORAGE_KEY = "custom_dashboard_folders";
 
 function getCurrentUser(): string {
-  // Reads the username saved by LoginPage on successful login
-  return localStorage.getItem("saved_username") || "anonymous";
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) return localStorage.getItem("saved_username") || "anonymous";
+    const payload = token.split(".")[1];
+    if (!payload) return localStorage.getItem("saved_username") || "anonymous";
+    const json = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+    return (
+      json.preferred_username ||
+      json.username ||
+      json.email ||
+      json.sub ||
+      localStorage.getItem("saved_username") ||
+      "anonymous"
+    );
+  } catch {
+    return localStorage.getItem("saved_username") || "anonymous";
+  }
 }
 
 function loadAllFolders(): CustomFolder[] {
