@@ -1,23 +1,20 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { apiService, Endpoint } from "../services/api";
 import DynamicChartBuilder from "../components/DynamicChartBuilder";
 import RealTimeDashboardView from "../components/dashboards/RealTimeDashboardView";
 import SingleDeviceDashboardView from "../components/dashboards/SingleDeviceDashboardView";
-import { ArrowLeftOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, FolderOpenOutlined } from "@ant-design/icons";
 import Select from "react-select";
 
 // Cache to avoid refetch
 const deviceCache: Record<string, string[]> = {};
 const measurementCache: Record<string, string> = {};
 
-// Junk/placeholder values the API sometimes returns — treat these as "no value"
 const INVALID_DB_VALUES = new Set([
   "string", "null", "NULL", "", "admin", "NR1", "NR2",
 ]);
 
-// Mobile: MOB*, MG* only
-// Stationary: everything else (LMG*, SG*, etc.)
 function isMobileDevice(id: string): boolean {
   const upper = id.toUpperCase();
   return upper.startsWith("MOB") || upper.startsWith("MG");
@@ -26,18 +23,14 @@ function isMobileDevice(id: string): boolean {
 function isStationaryDevice(id: string): boolean {
   return !isMobileDevice(id);
 }
+
 function resolveMeasurement(groupInfo: any): string {
   if (!groupInfo) return "sendata";
-
   const primary = groupInfo.primarydb?.toLowerCase();
-
-  // ✅ TRUST ONLY primarydb (your backend truth)
-  if (primary && primary !== "string") {
-    return primary;
-  }
-
+  if (primary && primary !== "string") return primary;
   return "sendata";
 }
+
 const MultiDeviceDashboardPage: React.FC = () => {
   const { groupId, dashboardType } = useParams<{
     groupId: string;
@@ -45,13 +38,28 @@ const MultiDeviceDashboardPage: React.FC = () => {
   }>();
 
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // ── Detect if this is a custom folder route ───────────────────────────────
+  const isCustomFolder =
+    location.state?.isCustomFolder === true ||
+    dashboardType?.startsWith("custom-folder-");
+
+  const folderName: string = location.state?.folderName || "My Folder";
+
+  // ── Resolve the actual dashboard type for custom folders ─────────────────
+  // Custom folders always behave like multi-device-dashboard-stationary-device
+  // (all devices, line chart) unless you want to store a type per folder.
+  const effectiveDashboardType = isCustomFolder
+    ? "multi-device-dashboard-stationary-device"
+    : dashboardType;
 
   const [allDevicesList, setAllDevicesList] = useState<string[]>([]);
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [measurement, setMeasurement] = useState<string>("sendata");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedFilter, setSelectedFilter] = useState("15M");
+  const [selectedFilter, setSelectedFilter] = useState("3H");
 
   const timeFilterOptions = [
     { label: "5M", value: "5M" },
@@ -59,7 +67,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
     { label: "1H", value: "1H" },
     { label: "3H", value: "3H" },
     { label: "5H", value: "5H" },
-    { label: "1D", value: "1D" }
+    { label: "1D", value: "1D" },
   ];
 
   useEffect(() => {
@@ -73,46 +81,43 @@ const MultiDeviceDashboardPage: React.FC = () => {
         let allDeviceIds: string[] = [];
         let resolvedMeasurement = "sendata";
 
-        // ── Devices ──────────────────────────────────────────
         if (deviceCache[groupId]) {
           allDeviceIds = deviceCache[groupId];
           resolvedMeasurement = measurementCache[groupId] ?? "sendata";
         } else {
-          const res = await apiService.get(Endpoint.GROUP_DEVICES, {
-            id: groupId,
-          });
+          const res = await apiService.get(Endpoint.GROUP_DEVICES, { id: groupId });
           allDeviceIds = res?.data?.devices || [];
           deviceCache[groupId] = allDeviceIds;
 
-          // ── Measurement: read from group info ──
           const groupInfo = res?.data?.group?.[0];
           resolvedMeasurement = resolveMeasurement(groupInfo);
           measurementCache[groupId] = resolvedMeasurement;
 
           console.log(
-            `📦 Group "${groupId}" | db="${groupInfo?.db}" | primarydb="${groupInfo?.primarydb}" | ✅ resolved="${resolvedMeasurement}"`
+            `📦 Group "${groupId}" | primarydb="${groupInfo?.primarydb}" | ✅ resolved="${resolvedMeasurement}"`
           );
         }
 
         setMeasurement(resolvedMeasurement);
 
-        // ── Filter by dashboard type ──────────────────────────
+        // ── Filter by effective dashboard type ────────────────────────────
         let initialFilter = allDeviceIds;
-        if (dashboardType?.includes("mobile")) {
+        if (effectiveDashboardType?.includes("mobile")) {
           initialFilter = allDeviceIds.filter(isMobileDevice);
-        } else if (dashboardType?.includes("stationary")) {
+        } else if (effectiveDashboardType?.includes("stationary")) {
           initialFilter = allDeviceIds.filter(isStationaryDevice);
         }
 
+        // For custom folders: show ALL devices (user picks)
+        if (isCustomFolder) initialFilter = allDeviceIds;
+
         setAllDevicesList(initialFilter);
 
-        // Default: limit to 10 so it doesn't break browser initially
         let initialSelection = initialFilter.slice(0, 10);
-        if (dashboardType?.includes("single-device")) {
+        if (effectiveDashboardType?.includes("single-device")) {
           initialSelection = initialFilter.length > 0 ? [initialFilter[0]] : [];
         }
         setSelectedDevices(initialSelection);
-
       } catch (err) {
         console.error("Failed to fetch devices", err);
         setError("Failed to load devices");
@@ -122,13 +127,16 @@ const MultiDeviceDashboardPage: React.FC = () => {
     }
 
     loadDevices();
-  }, [groupId, dashboardType]);
+  }, [groupId, effectiveDashboardType, isCustomFolder]);
 
-  const pageTitle = dashboardType
-    ? dashboardType.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-    : "Dashboard";
+  // ── Page title ────────────────────────────────────────────────────────────
+  const pageTitle = isCustomFolder
+    ? folderName
+    : dashboardType
+      ? dashboardType.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+      : "Dashboard";
 
-  const isSingleDevice = dashboardType?.includes("single-device");
+  const isSingleDevice = effectiveDashboardType?.includes("single-device");
 
   const deviceOptions = useMemo(() => {
     const opts = allDevicesList.map((id) => ({ label: id, value: id }));
@@ -150,6 +158,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
     }
   };
 
+  // ── Header node ───────────────────────────────────────────────────────────
   const headerNode = (
     <div className="flex items-center gap-4">
       <button
@@ -159,7 +168,12 @@ const MultiDeviceDashboardPage: React.FC = () => {
         <ArrowLeftOutlined />
       </button>
       <div>
-        <h1 className="text-2xl font-bold dark:text-white">{pageTitle}</h1>
+        <div className="flex items-center gap-2">
+          {isCustomFolder && (
+            <FolderOpenOutlined className="text-blue-500 text-lg" />
+          )}
+          <h1 className="text-2xl font-bold dark:text-white">{pageTitle}</h1>
+        </div>
         <p className="text-sm text-blue-600">{groupId}</p>
       </div>
     </div>
@@ -167,7 +181,22 @@ const MultiDeviceDashboardPage: React.FC = () => {
 
   const devicesForChart = selectedDevices.map((id) => ({ label: id, value: id }));
 
+  // ── Render dashboard view ─────────────────────────────────────────────────
   const renderDashboardView = () => {
+    // Custom folders always use DynamicChartBuilder (line charts, all devices)
+    if (isCustomFolder) {
+      return (
+        <DynamicChartBuilder
+          devices={devicesForChart}
+          storageKeyPattern={dashboardType || "custom-folder"}
+          headerNode={headerNode}
+          defaultChartType="line"
+          measurement={measurement}
+          timeFilter={selectedFilter}
+        />
+      );
+    }
+
     switch (dashboardType) {
       case "real-time-dashboard":
         return (
@@ -235,7 +264,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {/* DEVICE SELECTOR TOP BAR */}
+            {/* DEVICE SELECTOR + TIME FILTER */}
             <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow border dark:border-gray-700 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
               <div className="flex flex-col md:flex-row items-center gap-4">
                 <span className="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap pl-2">
@@ -245,7 +274,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
                   <Select
                     isMulti={!isSingleDevice}
                     options={deviceOptions}
-                    isSearchable={true}
+                    isSearchable
                     value={
                       isSingleDevice
                         ? deviceOptions.find((d) => selectedDevices[0] === d.value)
@@ -261,23 +290,16 @@ const MultiDeviceDashboardPage: React.FC = () => {
                           MultiValue: () => null,
                           ValueContainer: (props) => {
                             const { children } = props;
-                            const selectedCount = selectedDevices.length;
-                            let text = "";
-
-                            if (
-                              selectedCount === allDevicesList.length &&
-                              allDevicesList.length > 0
-                            ) {
-                              text = "All Devices Selected";
-                            } else if (selectedCount > 0) {
-                              text = `${selectedCount} Device(s) Selected`;
-                            }
-
+                            const count = selectedDevices.length;
+                            const text =
+                              count === allDevicesList.length && count > 0
+                                ? "All Devices Selected"
+                                : count > 0
+                                  ? `${count} Device(s) Selected`
+                                  : "";
                             return (
                               <div className="flex items-center px-2 text-gray-700 dark:text-gray-200 w-full">
-                                {text && (
-                                  <span className="mr-2 font-medium">{text}</span>
-                                )}
+                                {text && <span className="mr-2 font-medium">{text}</span>}
                                 <div className="flex-1">{children}</div>
                               </div>
                             );
@@ -289,11 +311,10 @@ const MultiDeviceDashboardPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* RIGHT SIDE (NEW TIME FILTER) */}
               <div className="w-full md:w-40 mr-2">
                 <Select
                   options={timeFilterOptions}
-                  value={timeFilterOptions.find(opt => opt.value === selectedFilter)}
+                  value={timeFilterOptions.find((o) => o.value === selectedFilter)}
                   onChange={(opt) => setSelectedFilter(opt?.value || "15M")}
                   className="text-sm"
                   isSearchable={false}
