@@ -23,6 +23,7 @@ interface DynamicChartBuilderProps {
     headerNode?: React.ReactNode;
     defaultChartType?: "line" | "bar" | "pie" | "scatter" | "composed" | "radar";
     measurement?: string; // ✅ dynamic per group
+    timeFilter?: string;
 }
 
 export default function DynamicChartBuilder({
@@ -31,6 +32,7 @@ export default function DynamicChartBuilder({
     headerNode,
     defaultChartType = "line",
     measurement = "gurprod", // ✅ default fallback
+    timeFilter,
 }: DynamicChartBuilderProps) {
     const STORAGE_KEY = `charts_${window.location.pathname}_${storageKeyPattern}`;
 
@@ -209,8 +211,8 @@ export default function DynamicChartBuilder({
                         <h2 className="text-md font-semibold mb-2 text-gray-700 dark:text-gray-200 uppercase">
                             {chart.yKey}
                         </h2>
-                        {/* ✅ Pass measurement down to RenderChart */}
-                        <RenderChart config={chart} devices={devices} measurement={measurement} />
+                        {/* ✅ Pass measurement and timeFilter down to RenderChart */}
+                        <RenderChart config={chart} devices={devices} measurement={measurement} timeFilter={timeFilter} />
                     </div>
                 ))}
                 {charts.length === 0 && (

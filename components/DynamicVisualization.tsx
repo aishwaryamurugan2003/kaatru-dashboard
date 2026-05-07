@@ -1,14 +1,6 @@
 import React, { useState } from "react";
-import {
-  LineChart, Line,
-  BarChart, Bar,
-  ComposedChart,
-  PieChart, Pie, Cell,
-  RadarChart, Radar,
-  XAxis, YAxis, Tooltip, CartesianGrid, Legend,
-  PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  ResponsiveContainer
-} from "recharts";
+import Plot from "react-plotly.js";
+import { commonPlotlyConfig } from "../utils/plotlyConfig";
 
 type Props = {
   data: any[];
@@ -31,9 +23,7 @@ export default function DynamicVisualization({ data }: Props) {
 
   function toggleField(value: string) {
     setYAxes((prev) =>
-      prev.includes(value)
-        ? prev.filter((v) => v !== value)
-        : [...prev, value]
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
     );
   }
 
@@ -45,17 +35,108 @@ export default function DynamicVisualization({ data }: Props) {
     setYAxes([]);
   }
 
-  // Pie data per device
-  const pieData =
-    chartType === "pie" && selectedDevice
-      ? fields.map((f) => {
-          const device = data.find((d) => d.device === selectedDevice);
-          return {
-            name: f.label,
-            value: device?.[f.value] || 0,
-          };
-        })
-      : data;
+  const devices = data.map((d) => d.device);
+
+  // ---- Build Plotly traces based on chartType ----
+  let traces: Plotly.Data[] = [];
+  let layout: Partial<Plotly.Layout> = {
+    margin: { t: 20, r: 20, b: 60, l: 50 },
+    paper_bgcolor: "transparent",
+    plot_bgcolor: "transparent",
+    showlegend: true,
+    legend: { orientation: "h", y: -0.2 },
+    xaxis: { showgrid: true, gridcolor: "#f3f4f6" },
+    yaxis: { showgrid: true, gridcolor: "#f3f4f6" },
+    dragmode: "zoom",
+  };
+
+  if (chartType === "line") {
+    traces = yAxes.map((axis, i) => ({
+      x: devices,
+      y: data.map((d) => d[axis] ?? null),
+      type: "scatter" as const,
+      mode: "lines+markers" as const,
+      name: fields.find((f) => f.value === axis)?.label ?? axis,
+      line: { color: COLORS[i % COLORS.length], width: 2 },
+      marker: { color: COLORS[i % COLORS.length] },
+    }));
+    layout = { ...layout, xaxis: { ...layout.xaxis, title: { text: "Device" } } };
+  }
+
+  if (chartType === "bar") {
+    traces = yAxes.map((axis, i) => ({
+      x: devices,
+      y: data.map((d) => d[axis] ?? null),
+      type: "bar" as const,
+      name: fields.find((f) => f.value === axis)?.label ?? axis,
+      marker: { color: COLORS[i % COLORS.length] },
+    }));
+    layout = { ...layout, barmode: "group" as const };
+  }
+
+  if (chartType === "composed") {
+    // composed: first half bars, rest lines
+    traces = yAxes.map((axis, i) => {
+      const label = fields.find((f) => f.value === axis)?.label ?? axis;
+      const color = COLORS[i % COLORS.length];
+      if (i % 2 === 0) {
+        return {
+          x: devices,
+          y: data.map((d) => d[axis] ?? null),
+          type: "bar" as const,
+          name: label,
+          marker: { color },
+        };
+      }
+      return {
+        x: devices,
+        y: data.map((d) => d[axis] ?? null),
+        type: "scatter" as const,
+        mode: "lines+markers" as const,
+        name: label,
+        line: { color, width: 2 },
+      };
+    });
+    layout = { ...layout, barmode: "group" as const };
+  }
+
+  if (chartType === "pie") {
+    const device = data.find((d) => d.device === selectedDevice);
+    const pieValues = device
+      ? fields.map((f) => ({ name: f.label, value: device[f.value] ?? 0 }))
+      : [];
+    traces = [
+      {
+        labels: pieValues.map((p) => p.name),
+        values: pieValues.map((p) => p.value),
+        type: "pie" as const,
+        hole: 0.45,
+        marker: { colors: COLORS },
+        textinfo: "label+percent",
+        hovertemplate: "<b>%{label}</b><br>Value: %{value:.2f}<br>%{percent}<extra></extra>",
+      },
+    ];
+    layout = { ...layout, showlegend: true };
+  }
+
+  if (chartType === "radar") {
+    traces = yAxes.map((axis, i) => ({
+      type: "scatterpolar" as const,
+      r: data.map((d) => d[axis] ?? 0),
+      theta: devices,
+      fill: "toself" as const,
+      name: fields.find((f) => f.value === axis)?.label ?? axis,
+      line: { color: COLORS[i % COLORS.length] },
+      fillcolor: COLORS[i % COLORS.length] + "55",
+    }));
+    layout = {
+      ...layout,
+      polar: {
+        radialaxis: { visible: true, color: "#6b7280" },
+        angularaxis: { color: "#6b7280" },
+      },
+    };
+  }
 
   return (
     <div className="bg-white p-4 rounded-xl shadow space-y-4">
@@ -76,7 +157,6 @@ export default function DynamicVisualization({ data }: Props) {
           <option value="radar">Radar Chart</option>
         </select>
 
-        {/* Select All / Clear */}
         <button
           className="px-3 py-1 bg-blue-500 text-white rounded"
           onClick={selectAll}
@@ -126,114 +206,13 @@ export default function DynamicVisualization({ data }: Props) {
 
       {/* Chart */}
       <div className="w-full h-[340px]">
-        <ResponsiveContainer>
-          <>
-            {/* LINE */}
-            {chartType === "line" && (
-              <LineChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="device" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                {yAxes.map((axis, i) => (
-                  <Line
-                    key={axis}
-                    type="monotone"
-                    dataKey={axis}
-                    stroke={COLORS[i % COLORS.length]}
-                    strokeWidth={2}
-                    isAnimationActive
-                  />
-                ))}
-              </LineChart>
-            )}
-
-            {/* BAR */}
-            {chartType === "bar" && (
-              <BarChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="device" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                {yAxes.map((axis, i) => (
-                  <Bar
-                    key={axis}
-                    dataKey={axis}
-                    fill={COLORS[i % COLORS.length]}
-                    isAnimationActive
-                  />
-                ))}
-              </BarChart>
-            )}
-
-            {/* COMPOSED */}
-            {chartType === "composed" && (
-              <ComposedChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="device" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                {yAxes.map((axis, i) => (
-                  <Line
-                    key={axis}
-                    type="monotone"
-                    dataKey={axis}
-                    stroke={COLORS[i % COLORS.length]}
-                    strokeWidth={2}
-                    isAnimationActive
-                  />
-                ))}
-              </ComposedChart>
-            )}
-
-            {/* PIE (device → metrics donut) */}
-            {chartType === "pie" && selectedDevice && (
-              <PieChart>
-                <Tooltip />
-                <Legend />
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={60}   // donut effect
-                  outerRadius={110}
-                  label
-                  isAnimationActive
-                >
-                  {pieData.map((entry: any, index: number) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-              </PieChart>
-            )}
-
-            {/* RADAR */}
-            {chartType === "radar" && (
-              <RadarChart data={data}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="device" />
-                <PolarRadiusAxis />
-                {yAxes.map((axis, i) => (
-                  <Radar
-                    key={axis}
-                    dataKey={axis}
-                    stroke={COLORS[i % COLORS.length]}
-                    fill={COLORS[i % COLORS.length]}
-                    fillOpacity={0.4}
-                    isAnimationActive
-                  />
-                ))}
-                <Legend />
-              </RadarChart>
-            )}
-          </>
-        </ResponsiveContainer>
+        <Plot
+          data={traces}
+          layout={layout}
+          useResizeHandler
+          style={{ width: "100%", height: "100%" }}
+          config={{ ...commonPlotlyConfig, responsive: true }}
+        />
       </div>
     </div>
   );

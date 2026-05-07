@@ -1,16 +1,9 @@
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
+import Plot from "react-plotly.js";
 import { useEffect, useState } from "react";
 import { fetchSensorData } from "../services/api";
 import { parseSensorHistory } from "../utils/parseSensorHistory";
 import Loading from "../components/Loading";
+import { commonPlotlyConfig } from "../utils/plotlyConfig";
 
 const FILTERS = [
   { label: "5M", value: "5M" },
@@ -20,11 +13,14 @@ const FILTERS = [
   { label: "1D", value: "1D" },
 ];
 
-export default function SensorHistoryChart({
-  deviceId,
-}: {
-  deviceId?: string;
-}) {
+const SERIES_CONFIG = [
+  { key: "pm25",     label: "PM2.5",    color: "#2563eb" },
+  { key: "pm10",     label: "PM10",     color: "#16a34a" },
+  { key: "temp",     label: "Temp",     color: "#f97316" },
+  { key: "humidity", label: "Humidity", color: "#06b6d4" },
+] as const;
+
+export default function SensorHistoryChart({ deviceId }: { deviceId?: string }) {
   const [filter, setFilter] = useState("15M");
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,7 +45,7 @@ export default function SensorHistoryChart({
       .then((res) => {
         const parsed = parseSensorHistory(res);
 
-        const merged = parsed.pm25.map((_, i) => ({
+        const merged = parsed.pm25.map((_: any, i: number) => ({
           time: parsed.pm25[i]?.time,
           pm25: parsed.pm25[i]?.value,
           pm10: parsed.pm10[i]?.value,
@@ -68,6 +64,23 @@ export default function SensorHistoryChart({
       });
   }, [deviceId, filter]);
 
+  const times = data.map((d) => {
+    const dt = new Date(d.time);
+    return isNaN(dt.getTime()) ? d.time : dt;
+  });
+
+  const traces: Plotly.Data[] = SERIES_CONFIG
+    .filter((s) => enabled[s.key])
+    .map((s) => ({
+      x: times,
+      y: data.map((d) => d[s.key]),
+      type: "scatter" as const,
+      mode: "lines" as const,
+      name: s.label,
+      line: { color: s.color, width: 2 },
+      hovertemplate: `<b>${s.label}</b>: %{y:.2f}<br>%{x}<extra></extra>`,
+    }));
+
   return (
     <div className="h-full flex flex-col">
       {/* HEADER */}
@@ -80,10 +93,11 @@ export default function SensorHistoryChart({
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
-              className={`px-2 py-1 text-xs rounded ${filter === f.value
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 dark:bg-gray-700"
-                }`}
+              className={`px-2 py-1 text-xs rounded ${
+                filter === f.value
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200 dark:bg-gray-700"
+              }`}
             >
               {f.label}
             </button>
@@ -93,16 +107,16 @@ export default function SensorHistoryChart({
 
       {/* TOGGLES */}
       <div className="flex gap-3 text-xs mb-2">
-        {Object.keys(enabled).map((k) => (
-          <label key={k} className="flex items-center gap-1">
+        {SERIES_CONFIG.map((s) => (
+          <label key={s.key} className="flex items-center gap-1">
             <input
               type="checkbox"
-              checked={(enabled as any)[k]}
+              checked={enabled[s.key]}
               onChange={() =>
-                setEnabled((p) => ({ ...p, [k]: !(p as any)[k] }))
+                setEnabled((p) => ({ ...p, [s.key]: !p[s.key] }))
               }
             />
-            {k.toUpperCase()}
+            {s.key.toUpperCase()}
           </label>
         ))}
       </div>
@@ -114,51 +128,33 @@ export default function SensorHistoryChart({
         ) : data.length === 0 ? (
           <div className="text-gray-500">No data available</div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data}>
-              <XAxis
-                dataKey="time"
-                tickFormatter={(value) => {
-                  if (!value) return "";
-
-                  const d = new Date(value);
-                  if (isNaN(d.getTime())) return value;
-
-                  return d.toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
-                }}
-              />
-
-              <YAxis />
-              <Tooltip
-                labelFormatter={(value) => {
-                  if (!value) return "";
-
-                  const d = new Date(value);
-                  if (isNaN(d.getTime())) return value;
-
-                  return d.toLocaleString();
-                }}
-              />
-
-              <Legend />
-
-              {enabled.pm25 && (
-                <Line dataKey="pm25" stroke="#2563eb" dot={false} />
-              )}
-              {enabled.pm10 && (
-                <Line dataKey="pm10" stroke="#16a34a" dot={false} />
-              )}
-              {enabled.temp && (
-                <Line dataKey="temp" stroke="#f97316" dot={false} />
-              )}
-              {enabled.humidity && (
-                <Line dataKey="humidity" stroke="#06b6d4" dot={false} />
-              )}
-            </LineChart>
-          </ResponsiveContainer>
+          <Plot
+            data={traces}
+            layout={{
+              margin: { t: 10, r: 10, b: 50, l: 50 },
+              xaxis: {
+                type: "date",
+                tickformat: "%H:%M",
+                hoverformat: "%Y-%m-%d %H:%M",
+                showgrid: true,
+                gridcolor: "#f3f4f6",
+                tickfont: { color: "#6b7280", size: 12 },
+              },
+              yaxis: {
+                showgrid: true,
+                gridcolor: "#f3f4f6",
+                tickfont: { color: "#6b7280", size: 12 },
+              },
+              showlegend: true,
+              legend: { orientation: "h", y: -0.15 },
+              paper_bgcolor: "transparent",
+              plot_bgcolor: "transparent",
+              dragmode: "zoom",
+            }}
+            useResizeHandler
+            style={{ width: "100%", height: "100%" }}
+            config={{ ...commonPlotlyConfig, responsive: true }}
+          />
         )}
       </div>
     </div>

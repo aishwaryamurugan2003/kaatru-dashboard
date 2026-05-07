@@ -358,7 +358,6 @@ const RealtimeDashboardPage: React.FC = () => {
 
   return (
     <div className="p-6 space-y-4 bg-gray-50 dark:bg-gray-900">
-
       {/* TOP FILTER BAR */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 bg-white dark:bg-gray-800 p-3 rounded-xl shadow relative">
         <Select

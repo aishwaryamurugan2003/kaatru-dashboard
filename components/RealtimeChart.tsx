@@ -1,8 +1,9 @@
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import Plot from "react-plotly.js";
 import { useEffect, useState } from "react";
+import { commonPlotlyConfig } from "../utils/plotlyConfig";
 
 export default function RealtimeChart({ value }: { value?: number }) {
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<{ time: string; value: number }[]>([]);
 
   useEffect(() => {
     if (value === undefined || isNaN(value)) return;
@@ -14,13 +15,29 @@ export default function RealtimeChart({ value }: { value?: number }) {
   }, [value]);
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data}>
-        <XAxis dataKey="time" hide />
-        <YAxis />
-        <Tooltip />
-        <Line type="monotone" dataKey="value" stroke="#2563eb" dot={false} />
-      </LineChart>
-    </ResponsiveContainer>
+    <Plot
+      data={[
+        {
+          x: data.map((d) => d.time),
+          y: data.map((d) => d.value),
+          type: "scatter",
+          mode: "lines",
+          line: { color: "#2563eb" },
+          hovertemplate: "%{x}<br>%{y:.2f}<extra></extra>",
+        },
+      ]}
+      layout={{
+        margin: { t: 10, r: 10, b: 30, l: 40 },
+        xaxis: { showticklabels: false, showgrid: false },
+        yaxis: { showgrid: true, gridcolor: "#f3f4f6" },
+        showlegend: false,
+        paper_bgcolor: "transparent",
+        plot_bgcolor: "transparent",
+        dragmode: "zoom",
+      }}
+      useResizeHandler
+      style={{ width: "100%", height: "100%" }}
+      config={{ ...commonPlotlyConfig, responsive: true }}
+    />
   );
 }

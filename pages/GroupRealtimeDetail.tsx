@@ -19,6 +19,7 @@ import { FaTemperatureEmpty } from "react-icons/fa6";
 
 
 
+
 // --- Rules Configuration (can be moved to a JSON file later) ---
 const RULES_CONFIG = [
     {

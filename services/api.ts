@@ -877,20 +877,38 @@ export const apiService: ApiService =
 export async function fetchSensorData({
   deviceIds,
   fields = "temp,rh,sPM2",
-  start = "-12h",
+  start: passedStart,
   stop = "now()",
-  interval = "5m",
-  measurement = "gurprod", // ✅ now dynamic
+  interval: passedInterval,
+  measurement = "gurprod",
+  timeFilter,
 }: {
   deviceIds: string[];
   fields?: string;
   start?: string;
   stop?: string;
   interval?: string;
-  measurement?: string;   // ✅ add this
+  measurement?: string;
+  timeFilter?: string;
 }) {
+  // ✅ Map timeFilter to start and interval if provided
+  let start = passedStart || "-12h";
+  let interval = passedInterval || "5m";
+
+  if (timeFilter) {
+    switch (timeFilter) {
+      case "5M": start = "-5m"; interval = "10s"; break;
+      case "15M": start = "-15m"; interval = "30s"; break;
+      case "1H": start = "-1h"; interval = "2m"; break;
+      case "3H": start = "-3h"; interval = "5m"; break;
+      case "5H": start = "-5h"; interval = "10m"; break;
+      case "1D": start = "-24h"; interval = "30m"; break;
+      default: break;
+    }
+  }
+
   const baseParams = new URLSearchParams({
-    measurement,           // ✅ use dynamic value
+    measurement,
     start,
     stop,
     interval,

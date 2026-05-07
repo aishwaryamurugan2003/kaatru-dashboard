@@ -51,6 +51,16 @@ const MultiDeviceDashboardPage: React.FC = () => {
   const [measurement, setMeasurement] = useState<string>("sendata");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedFilter, setSelectedFilter] = useState("15M");
+
+  const timeFilterOptions = [
+    { label: "5M", value: "5M" },
+    { label: "15M", value: "15M" },
+    { label: "1H", value: "1H" },
+    { label: "3H", value: "3H" },
+    { label: "5H", value: "5H" },
+    { label: "1D", value: "1D" }
+  ];
 
   useEffect(() => {
     async function loadDevices() {
@@ -165,6 +175,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
             groupId={groupId!}
             devices={selectedDevices}
             headerNode={headerNode}
+            timeFilter={selectedFilter}
           />
         );
 
@@ -175,6 +186,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
             groupId={groupId!}
             devices={selectedDevices}
             headerNode={headerNode}
+            timeFilter={selectedFilter}
           />
         );
 
@@ -186,6 +198,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
             headerNode={headerNode}
             defaultChartType="scatter"
             measurement={measurement}
+            timeFilter={selectedFilter}
           />
         );
 
@@ -199,6 +212,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
             headerNode={headerNode}
             defaultChartType="line"
             measurement={measurement}
+            timeFilter={selectedFilter}
           />
         );
     }
@@ -222,54 +236,67 @@ const MultiDeviceDashboardPage: React.FC = () => {
         ) : (
           <div className="flex flex-col gap-4">
             {/* DEVICE SELECTOR TOP BAR */}
-            <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow border dark:border-gray-700 flex flex-col md:flex-row items-center gap-4">
-              <span className="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap pl-2">
-                Select Devices
-              </span>
-              <div className="w-full md:w-80">
+            <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow border dark:border-gray-700 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+              <div className="flex flex-col md:flex-row items-center gap-4">
+                <span className="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap pl-2">
+                  Select Devices
+                </span>
+                <div className="w-full md:w-80">
+                  <Select
+                    isMulti={!isSingleDevice}
+                    options={deviceOptions}
+                    isSearchable={true}
+                    value={
+                      isSingleDevice
+                        ? deviceOptions.find((d) => selectedDevices[0] === d.value)
+                        : deviceOptions.filter((d) => selectedDevices.includes(d.value))
+                    }
+                    onChange={handleDeviceSelect}
+                    placeholder="Select Device(s)..."
+                    className="text-sm"
+                    hideSelectedOptions={false}
+                    components={
+                      !isSingleDevice
+                        ? {
+                          MultiValue: () => null,
+                          ValueContainer: (props) => {
+                            const { children } = props;
+                            const selectedCount = selectedDevices.length;
+                            let text = "";
+
+                            if (
+                              selectedCount === allDevicesList.length &&
+                              allDevicesList.length > 0
+                            ) {
+                              text = "All Devices Selected";
+                            } else if (selectedCount > 0) {
+                              text = `${selectedCount} Device(s) Selected`;
+                            }
+
+                            return (
+                              <div className="flex items-center px-2 text-gray-700 dark:text-gray-200 w-full">
+                                {text && (
+                                  <span className="mr-2 font-medium">{text}</span>
+                                )}
+                                <div className="flex-1">{children}</div>
+                              </div>
+                            );
+                          },
+                        }
+                        : undefined
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* RIGHT SIDE (NEW TIME FILTER) */}
+              <div className="w-full md:w-40 mr-2">
                 <Select
-                  isMulti={!isSingleDevice}
-                  options={deviceOptions}
-                  isSearchable={true}
-                  value={
-                    isSingleDevice
-                      ? deviceOptions.find((d) => selectedDevices[0] === d.value)
-                      : deviceOptions.filter((d) => selectedDevices.includes(d.value))
-                  }
-                  onChange={handleDeviceSelect}
-                  placeholder="Select Device(s)..."
+                  options={timeFilterOptions}
+                  value={timeFilterOptions.find(opt => opt.value === selectedFilter)}
+                  onChange={(opt) => setSelectedFilter(opt?.value || "15M")}
                   className="text-sm"
-                  hideSelectedOptions={false}
-                  components={
-                    !isSingleDevice
-                      ? {
-                        MultiValue: () => null,
-                        ValueContainer: (props) => {
-                          const { children } = props;
-                          const selectedCount = selectedDevices.length;
-                          let text = "";
-
-                          if (
-                            selectedCount === allDevicesList.length &&
-                            allDevicesList.length > 0
-                          ) {
-                            text = "All Devices Selected";
-                          } else if (selectedCount > 0) {
-                            text = `${selectedCount} Device(s) Selected`;
-                          }
-
-                          return (
-                            <div className="flex items-center px-2 text-gray-700 dark:text-gray-200 w-full">
-                              {text && (
-                                <span className="mr-2 font-medium">{text}</span>
-                              )}
-                              <div className="flex-1">{children}</div>
-                            </div>
-                          );
-                        },
-                      }
-                      : undefined
-                  }
+                  isSearchable={false}
                 />
               </div>
             </div>

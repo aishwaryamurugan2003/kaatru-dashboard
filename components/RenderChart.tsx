@@ -1,19 +1,9 @@
-import React, { useEffect, useState, useRef } from "react";
-import {
-  BarChart, Bar,
-  PieChart, Pie, Cell,
-  RadarChart, Radar,
-  ComposedChart,
-  ScatterChart, Scatter,
-  AreaChart, Area, ReferenceArea,
-  XAxis, YAxis, Tooltip, CartesianGrid, Legend,
-  PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  ResponsiveContainer,
-  Line,
-} from "recharts";
+import React, { useEffect, useState, useCallback } from "react";
+import Plot from "react-plotly.js";
 import { fetchSensorData, convertToTimeSeries } from "../services/api";
+import { commonPlotlyConfig, customColorButton } from "../utils/plotlyConfig";
 
-function formatTime(value: any) {
+function formatTime(value: any): string {
   if (!value) return "";
   const date = new Date(value);
   return date.toLocaleTimeString();
@@ -32,47 +22,30 @@ export type ChartConfig = {
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
+/* ─────────────────────────────────────────────────────── */
+
 export function RenderChart({
   config,
   devices,
-  measurement = "gurprod", // ✅ dynamic per group
+  measurement = "gurprod",
+  timeFilter,
 }: {
   config: ChartConfig;
   devices: any[];
   measurement?: string;
+  timeFilter?: string;
 }) {
   const { type, yKey } = config;
 
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const [isolatedDevice, setIsolatedDevice] = useState<string | null>(null);
-  const handleLegendClick = (e: any) => {
-    setIsolatedDevice((prev) => (prev === e.value ? null : e.value));
-  };
+  // Legend isolation: map of trace name → true means HIDDEN
+  const [hiddenTraces, setHiddenTraces] = useState<Record<string, boolean>>({});
+  // Zoom range (undefined = autorange)
+  const [xRange, setXRange] = useState<[any, any] | undefined>(undefined);
+  const isZoomed = xRange !== undefined;
 
-  const [refAreaLeft, setRefAreaLeft] = useState<string | number | undefined>(undefined);
-  const [refAreaRight, setRefAreaRight] = useState<string | number | undefined>(undefined);
-  const [zoomLeft, setZoomLeft] = useState<string | number>("dataMin");
-  const [zoomRight, setZoomRight] = useState<string | number>("dataMax");
-
-  const handleMouseDown = (e: any) => { if (e?.activeLabel) setRefAreaLeft(e.activeLabel); };
-  const handleMouseMove = (e: any) => { if (refAreaLeft && e?.activeLabel) setRefAreaRight(e.activeLabel); };
-  const handleMouseUp = () => {
-    if (refAreaLeft && refAreaRight && refAreaLeft !== refAreaRight) {
-      const [min, max] = [refAreaLeft, refAreaRight].sort((a, b) => Number(a) - Number(b));
-      setZoomLeft(min);
-      setZoomRight(max);
-    }
-    setRefAreaLeft(undefined);
-    setRefAreaRight(undefined);
-  };
-  const zoomOut = () => {
-    setZoomLeft("dataMin");
-    setZoomRight("dataMax");
-  };
-
-  // ✅ Stable dependency: stringify devices + yKey + measurement to avoid infinite re-renders
   const deviceKey = devices.map((d) => d.value).join(",");
 
   useEffect(() => {
@@ -82,26 +55,46 @@ export function RenderChart({
       setLoading(true);
       try {
         const deviceIds = devices.map((d: any) => d.value);
-
-        const apiResponse = await fetchSensorData({
-          deviceIds,
-          fields: yKey,
-          measurement, // ✅ pass dynamic measurement
-        });
-
+        const apiResponse = await fetchSensorData({ deviceIds, fields: yKey, measurement, timeFilter });
         const allData = convertToTimeSeries(apiResponse, yKey);
-        console.log(`CHART [${yKey}] measurement=${measurement} → ${allData.length} points`);
+        console.log(`CHART [${yKey}] measurement=${measurement} filter=${timeFilter} → ${allData.length} points`);
         setData(allData);
       } catch (e) {
         console.error("CRITICAL API ERROR", e);
       }
       setLoading(false);
     }
-
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [yKey, deviceKey, measurement]); // ✅ use stable string keys
+  }, [yKey, deviceKey, measurement, timeFilter]);
 
+  const handleRelayout = useCallback((event: any) => {
+    if (event["xaxis.range[0]"] !== undefined && event["xaxis.range[1]"] !== undefined) {
+      setXRange([event["xaxis.range[0]"], event["xaxis.range[1]"]]);
+    } else if (event["xaxis.autorange"] === true) {
+      setXRange(undefined);
+    }
+  }, []);
+
+  const handleLegendClick = useCallback((event: any) => {
+    const name: string = event.data[event.curveNumber]?.name ?? "";
+    setHiddenTraces((prev) => {
+      const alreadyIsolated = Object.values(prev).some(Boolean) && !prev[name];
+      if (alreadyIsolated) {
+        // second click: un-isolate all
+        return {};
+      }
+      // isolate this trace (hide all others)
+      const next: Record<string, boolean> = {};
+      devices.forEach((d) => {
+        next[d.label] = d.label !== name;
+      });
+      return next;
+    });
+    return false; // prevent default Plotly toggle
+  }, [devices]);
+
+  /* ── Empty / Loading states ── */
   if (!devices.length) {
     return (
       <div className="h-[300px] flex items-center justify-center text-gray-500 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
@@ -109,7 +102,6 @@ export function RenderChart({
       </div>
     );
   }
-
   if (loading) {
     return (
       <div className="h-[300px] flex items-center justify-center text-gray-500 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 animate-pulse">
@@ -117,7 +109,6 @@ export function RenderChart({
       </div>
     );
   }
-
   if (!data.length) {
     return (
       <div className="flex items-center justify-center h-[300px] text-gray-500 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
@@ -126,250 +117,179 @@ export function RenderChart({
     );
   }
 
+  /* ── Build traces per type ── */
+  let traces: Plotly.Data[] = [];
+  let extraLayout: Partial<Plotly.Layout> = {};
+
+  const commonXLayout: Partial<Plotly.LayoutAxis> = {
+    type: "date",
+    showgrid: true,
+    gridcolor: "#f3f4f6",
+    tickfont: { color: "#6b7280", size: 12 },
+    ...(xRange ? { range: xRange } : { autorange: true }),
+  };
+  const commonYLayout: Partial<Plotly.LayoutAxis> = {
+    autorange: true,
+    showgrid: true,
+    gridcolor: "#f3f4f6",
+    tickfont: { color: "#6b7280", size: 12 },
+  };
+
+  if (type === "line") {
+    traces = devices.map((d, index) => {
+      const color = COLORS[index % COLORS.length];
+      const deviceData = data.filter((entry) => entry.device === d.value);
+      return {
+        x: deviceData.map((e) => new Date(e.srvtime)),
+        y: deviceData.map((e) => e.value),
+        type: "scatter" as const,
+        mode: "lines" as const,
+        fill: "tozeroy" as const,
+        fillcolor: color + "22",
+        name: d.label,
+        line: { color, width: 2.5 },
+        visible: hiddenTraces[d.label] ? "legendonly" : true as any,
+        connectgaps: true,
+        hovertemplate: `<b>${d.label}</b><br>%{x|%H:%M:%S}<br>%{y:.2f}<extra></extra>`,
+      };
+    });
+    extraLayout = { xaxis: commonXLayout, yaxis: commonYLayout };
+  }
+
+  if (type === "bar") {
+    traces = devices.map((d, index) => {
+      const color = COLORS[index % COLORS.length];
+      const deviceData = data.filter((entry) => entry.device === d.value);
+      return {
+        x: deviceData.map((e) => new Date(e.srvtime)),
+        y: deviceData.map((e) => e.value),
+        type: "bar" as const,
+        name: d.label,
+        marker: { color, opacity: 0.85 },
+        visible: hiddenTraces[d.label] ? "legendonly" : true as any,
+        hovertemplate: `<b>${d.label}</b><br>%{x|%H:%M:%S}<br>%{y:.2f}<extra></extra>`,
+      };
+    });
+    extraLayout = { xaxis: commonXLayout, yaxis: commonYLayout, barmode: "group" };
+  }
+
+  if (type === "pie") {
+    const pieData = data.map((d) => ({
+      name: formatTime(d.srvtime),
+      value: typeof d.value === "number" ? d.value : 0,
+    }));
+    traces = [
+      {
+        labels: pieData.map((d) => d.name),
+        values: pieData.map((d) => d.value),
+        type: "pie" as const,
+        hole: 0.4,
+        marker: { colors: COLORS },
+        hovertemplate: "<b>%{label}</b><br>%{value:.2f}<br>%{percent}<extra></extra>",
+        textinfo: "label+percent",
+      },
+    ];
+  }
+
+  if (type === "scatter") {
+    traces = devices.map((d, index) => {
+      const color = COLORS[index % COLORS.length];
+      const deviceData = data.filter((entry) => entry.device === d.value);
+      return {
+        x: deviceData.map((e) => new Date(e.srvtime)),
+        y: deviceData.map((e) => e.value),
+        type: "scatter" as const,
+        mode: "markers" as const,
+        name: d.label,
+        marker: { color, size: 6 },
+        visible: hiddenTraces[d.label] ? "legendonly" : true as any,
+        hovertemplate: `<b>${d.label}</b><br>%{x|%H:%M:%S}<br>%{y:.2f}<extra></extra>`,
+      };
+    });
+    extraLayout = { xaxis: commonXLayout, yaxis: commonYLayout };
+  }
+
+  if (type === "composed") {
+    const allX = data.map((e) => new Date(e.srvtime));
+    const allY = data.map((e) => e.value ?? 0);
+    traces = [
+      {
+        x: allX,
+        y: allY,
+        type: "bar" as const,
+        name: yKey + " (bar)",
+        marker: { color: "#10b981", opacity: 0.7 },
+        hovertemplate: `%{x|%H:%M:%S}<br>%{y:.2f}<extra>bar</extra>`,
+      },
+      {
+        x: allX,
+        y: allY,
+        type: "scatter" as const,
+        mode: "lines" as const,
+        name: yKey + " (line)",
+        line: { color: "#3b82f6", width: 2.5 },
+        hovertemplate: `%{x|%H:%M:%S}<br>%{y:.2f}<extra>line</extra>`,
+      },
+    ];
+    extraLayout = { xaxis: commonXLayout, yaxis: commonYLayout };
+  }
+
+  if (type === "radar") {
+    const radarData = data.map((d) => ({
+      time: formatTime(d.srvtime),
+      value: typeof d.value === "number" ? d.value : 0,
+    }));
+    traces = [
+      {
+        type: "scatterpolar" as const,
+        r: radarData.map((d) => d.value),
+        theta: radarData.map((d) => d.time),
+        fill: "toself" as const,
+        fillcolor: "#3b82f655",
+        name: yKey,
+        line: { color: "#3b82f6", width: 2 },
+      },
+    ];
+    extraLayout = { polar: { radialaxis: { visible: true, color: "#6b7280" } } };
+  }
+
+  const layout: Partial<Plotly.Layout> = {
+    margin: { t: 20, r: 20, b: 40, l: 50 },
+    paper_bgcolor: "transparent",
+    plot_bgcolor: "transparent",
+    showlegend: true,
+    legend: {
+      orientation: "h",
+      y: -0.18,
+      font: { size: 12 },
+    },
+    dragmode: "zoom",
+    ...extraLayout,
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 h-[320px] relative transition-all duration-200 hover:shadow-md">
-      {zoomLeft !== "dataMin" && (
+      {isZoomed && (
         <button
           className="absolute top-2 right-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-1 text-xs rounded border border-blue-200 transition-colors z-10 shadow-sm font-semibold"
-          onClick={zoomOut}
+          onClick={() => setXRange(undefined)}
         >
           Reset Zoom
         </button>
       )}
-      <ResponsiveContainer width="100%" height={300}>
-        <>
-          {/* ---------------- LINE / AREA ---------------- */}
-          {type === "line" && (
-            <AreaChart
-              data={data}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-            >
-              <defs>
-                {devices.map((d, index) => (
-                  <linearGradient key={d.value} id={`color${d.value}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0} />
-                  </linearGradient>
-                ))}
-              </defs>
-              <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f3f4f6" />
-              <XAxis
-                dataKey="srvtime"
-                type="number"
-                domain={[zoomLeft, zoomRight]}
-                allowDataOverflow
-                tickFormatter={formatTime}
-                tick={{ fill: "#6b7280", fontSize: 12 }}
-                tickMargin={10}
-                axisLine={{ stroke: "#e5e7eb" }}
-                tickLine={{ stroke: "#e5e7eb" }}
-              />
-              <YAxis
-                domain={["auto", "auto"]}
-                tickCount={6}
-                tickFormatter={(val) => Math.round(val).toString()}
-                tick={{ fill: "#6b7280", fontSize: 12 }}
-                tickMargin={10}
-                axisLine={{ stroke: "#e5e7eb" }}
-                tickLine={{ stroke: "#e5e7eb" }}
-              />
-              <Tooltip
-                labelFormatter={formatTime}
-                formatter={(value: number) => value.toFixed(2)}
-                contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
-              />
-              <Legend wrapperStyle={{ paddingTop: "10px", cursor: "pointer" }} onClick={handleLegendClick} />
-              {devices.map((d, index) => (
-                <Area
-                  hide={isolatedDevice !== null && isolatedDevice !== d.label}
-                  key={d.value}
-                  type="monotone"
-                  dataKey={(entry) => entry.device === d.value ? entry.value : null}
-                  stroke={COLORS[index % COLORS.length]}
-                  fill={`url(#color${d.value})`}
-                  strokeWidth={2.5}
-                  activeDot={{ r: 5, strokeWidth: 0 }}
-                  name={d.label}
-                  connectNulls
-                />
-              ))}
-              {refAreaLeft && refAreaRight && (
-                <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#3b82f6" fillOpacity={0.1} />
-              )}
-            </AreaChart>
-          )}
-
-          {/* ---------------- BAR ---------------- */}
-          {type === "bar" && (
-            <BarChart
-              data={data}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-              <XAxis
-                dataKey="srvtime"
-                type="number"
-                domain={[zoomLeft, zoomRight]}
-                allowDataOverflow
-                tickFormatter={formatTime}
-                tick={{ fill: "#6b7280", fontSize: 12 }}
-                axisLine={{ stroke: "#e5e7eb" }}
-              />
-              <YAxis
-                domain={["auto", "auto"]}
-                tickCount={6}
-                tick={{ fill: "#6b7280", fontSize: 12 }}
-                axisLine={{ stroke: "#e5e7eb" }}
-              />
-              <Tooltip
-                labelFormatter={formatTime}
-                formatter={(value: number) => value.toFixed(2)}
-                contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb" }}
-              />
-              <Legend wrapperStyle={{ cursor: "pointer" }} onClick={handleLegendClick} />
-              {devices.map((d, index) => (
-                <Bar
-                  hide={isolatedDevice !== null && isolatedDevice !== d.label}
-                  key={d.value}
-                  dataKey={(entry) => entry.device === d.value ? entry.value : null}
-                  fill={COLORS[index % COLORS.length]}
-                  name={d.label}
-                  radius={[4, 4, 0, 0]}
-                />
-              ))}
-              {refAreaLeft && refAreaRight && (
-                <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#3b82f6" fillOpacity={0.1} />
-              )}
-            </BarChart>
-          )}
-
-          {/* ---------------- PIE ---------------- */}
-          {type === "pie" && (
-            <PieChart>
-              <Tooltip
-                formatter={(value: number) => value.toFixed(2)}
-                contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb" }}
-              />
-              <Legend verticalAlign="bottom" />
-              <Pie
-                data={data.map((d) => ({ name: formatTime(d.srvtime), value: d.value }))}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                innerRadius={60}
-                paddingAngle={2}
-              >
-                {data.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
-              </Pie>
-            </PieChart>
-          )}
-
-          {/* ---------------- SCATTER ---------------- */}
-          {type === "scatter" && (
-            <ScatterChart
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-              <XAxis
-                dataKey="srvtime"
-                type="number"
-                domain={[zoomLeft, zoomRight]}
-                allowDataOverflow
-                tickFormatter={formatTime}
-                tick={{ fill: "#6b7280", fontSize: 12 }}
-              />
-              <YAxis
-                dataKey={(entry) => entry.value || 0}
-                domain={["auto", "auto"]}
-                tickCount={6}
-                tick={{ fill: "#6b7280", fontSize: 12 }}
-              />
-              <Tooltip
-                labelFormatter={formatTime}
-                formatter={(value: number) => typeof value === "number" ? value.toFixed(2) : value}
-                cursor={{ strokeDasharray: "3 3" }}
-                contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb" }}
-              />
-              <Legend wrapperStyle={{ cursor: "pointer" }} onClick={handleLegendClick} />
-              {devices.map((d, index) => (
-                <Scatter
-                  hide={isolatedDevice !== null && isolatedDevice !== d.label}
-                  key={d.value}
-                  name={d.label}
-                  data={data.filter((entry) => entry.device === d.value)}
-                  fill={COLORS[index % COLORS.length]}
-                />
-              ))}
-              {refAreaLeft && refAreaRight && (
-                <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#3b82f6" fillOpacity={0.1} />
-              )}
-            </ScatterChart>
-          )}
-
-          {/* ---------------- COMPOSED ---------------- */}
-          {type === "composed" && (
-            <ComposedChart
-              data={data}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-              <XAxis
-                dataKey="srvtime"
-                type="number"
-                domain={[zoomLeft, zoomRight]}
-                allowDataOverflow
-                tickFormatter={formatTime}
-                tick={{ fill: "#6b7280", fontSize: 12 }}
-              />
-              <YAxis
-                domain={["auto", "auto"]}
-                tickCount={6}
-                tick={{ fill: "#6b7280", fontSize: 12 }}
-              />
-              <Tooltip
-                labelFormatter={formatTime}
-                formatter={(value: number) => value.toFixed(2)}
-                contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb" }}
-              />
-              <Legend />
-              <Bar dataKey={(entry) => entry.value || 0} fill="#10b981" radius={[4, 4, 0, 0]} />
-              <Line type="monotone" dataKey={(entry) => entry.value || 0} stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
-              {refAreaLeft && refAreaRight && (
-                <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#3b82f6" fillOpacity={0.1} />
-              )}
-            </ComposedChart>
-          )}
-
-          {/* ---------------- RADAR ---------------- */}
-          {type === "radar" && (
-            <RadarChart
-              data={data.map((d) => ({ time: formatTime(d.srvtime), value: d.value }))}
-            >
-              <PolarGrid stroke="#e5e7eb" />
-              <PolarAngleAxis dataKey="time" tick={{ fill: "#6b7280", fontSize: 12 }} />
-              <PolarRadiusAxis />
-              <Tooltip
-                formatter={(value: number) => value.toFixed(2)}
-                contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb" }}
-              />
-              <Radar dataKey="value" stroke="#3b82f6" strokeWidth={2} fill="#3b82f6" fillOpacity={0.3} />
-              <Legend />
-            </RadarChart>
-          )}
-        </>
-      </ResponsiveContainer>
+      <Plot
+        data={traces}
+        layout={layout}
+        onRelayout={handleRelayout}
+        onLegendClick={handleLegendClick as any}
+        useResizeHandler
+        style={{ width: "100%", height: "100%" }}
+        config={{ 
+          ...commonPlotlyConfig, 
+          modeBarButtonsToAdd: [customColorButton],
+          responsive: true 
+        }}
+      />
     </div>
   );
 }
