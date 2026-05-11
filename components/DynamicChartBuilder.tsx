@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { RenderChart, ChartConfig } from "./RenderChart";
+import AnalyticsPanels from "./Analyticalpanel";
+import { fetchSensorData } from "../services/api";
 
 const fields = [
     "srvtime",
@@ -17,13 +19,21 @@ const fields = [
     "k30Co2",
 ];
 
+interface TimeSeriesEntry {
+    srvtime: number;
+    value: number;
+    device: string;
+}
+
 interface DynamicChartBuilderProps {
     devices: any[];
     storageKeyPattern: string;
     headerNode?: React.ReactNode;
     defaultChartType?: "line" | "bar" | "pie" | "scatter" | "composed" | "radar";
-    measurement?: string; // ✅ dynamic per group
+    measurement?: string;
     timeFilter?: string;
+    isCustomFolder?: boolean;
+    folderId?: number;
 }
 
 export default function DynamicChartBuilder({
@@ -31,7 +41,7 @@ export default function DynamicChartBuilder({
     storageKeyPattern,
     headerNode,
     defaultChartType = "line",
-    measurement = "gurprod", // ✅ default fallback
+    measurement = "gurprod",
     timeFilter,
 }: DynamicChartBuilderProps) {
     const STORAGE_KEY = `charts_${window.location.pathname}_${storageKeyPattern}`;
@@ -43,19 +53,19 @@ export default function DynamicChartBuilder({
     const [xKey, setXKey] = useState("srvtime");
     const [yKey, setYKey] = useState("sPM2");
 
+    // ── Analytics state ──────────────────────────────────────────────────────
+    const [rawApiResponse, setRawApiResponse] = useState<{ data: any[] } | null>(null);
+    const [allFieldData, setAllFieldData] = useState<Record<string, TimeSeriesEntry[]>>({});
+    const analyticsLoadedRef = useRef(false);
+
+    // ── Load charts from localStorage ───────────────────────────────────────
     useEffect(() => {
         try {
             const saved = localStorage.getItem(STORAGE_KEY);
             let parsed = saved ? JSON.parse(saved) : [];
 
             if (parsed.length === 0) {
-                parsed = [
-                    "sPM2",
-                    "sPM10",
-                    "temp",
-                    "rh",
-                    "sPM1"
-                ].map((param) => ({
+                parsed = ["sPM2", "sPM10", "temp", "rh", "sPM1"].map((param) => ({
                     id: param,
                     type: defaultChartType,
                     xKey: defaultChartType === "scatter" ? "rh" : "srvtime",
@@ -82,12 +92,37 @@ export default function DynamicChartBuilder({
         }
     }, [charts, STORAGE_KEY]);
 
+    // ── Fetch raw API response for AnalyticsPanels ───────────────────────────
+    // We fetch once whenever devices or timeFilter changes.
+    useEffect(() => {
+        if (!devices.length) return;
+
+        async function loadAnalytics() {
+            try {
+                const deviceIds = devices.map((d: any) => d.value);
+                // Fetch a representative field; AnalyticsPanels uses the raw response
+                // shape (rawApiResponse.data[].data[]) so any field works.
+                const response = await fetchSensorData({
+                    deviceIds,
+                    fields: "sPM2",
+                    measurement,
+                    timeFilter,
+                });
+                setRawApiResponse(response);
+            } catch (e) {
+                console.error("Analytics fetch error", e);
+            }
+        }
+
+        loadAnalytics();
+    }, [devices.map((d) => d.value).join(","), measurement, timeFilter]);
+
+    // ── Chart management ─────────────────────────────────────────────────────
     function addChart() {
         if (!xKey || !yKey) {
             alert("Select X and Y");
             return;
         }
-
         const newChart: ChartConfig = {
             id: Date.now().toString(),
             type,
@@ -98,7 +133,6 @@ export default function DynamicChartBuilder({
             w: 6,
             h: 6,
         };
-
         setCharts((prev) => [...prev, newChart]);
         setShowAdd(false);
     }
@@ -124,9 +158,9 @@ export default function DynamicChartBuilder({
 
     return (
         <div className="flex flex-col gap-6 w-full h-full">
-            {/* ---------------- HEADER & ADD CHART BUTTONS ---------------- */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
 
+            {/* ── HEADER & ADD CHART BUTTONS ─────────────────────────────────── */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex-1">
                     {headerNode && headerNode}
                 </div>
@@ -138,7 +172,6 @@ export default function DynamicChartBuilder({
                     >
                         + Add Chart
                     </button>
-
                     <button
                         className="bg-gray-500 hover:bg-gray-600 transition-colors text-white px-4 py-2 rounded-lg font-medium shadow-sm whitespace-nowrap"
                         onClick={resetCharts}
@@ -148,7 +181,7 @@ export default function DynamicChartBuilder({
                 </div>
             </div>
 
-            {/* ---------------- INLINE ADD CHART PANEL ---------------- */}
+            {/* ── INLINE ADD CHART PANEL ──────────────────────────────────────── */}
             {showAdd && (
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-200 dark:border-gray-700 flex flex-wrap gap-4 items-center self-end">
                     <select
@@ -195,7 +228,7 @@ export default function DynamicChartBuilder({
                 </div>
             )}
 
-            {/* ---------------- CHARTS GRID ---------------- */}
+            {/* ── CHARTS GRID ─────────────────────────────────────────────────── */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
                 {charts.map((chart) => (
                     <div
@@ -211,8 +244,12 @@ export default function DynamicChartBuilder({
                         <h2 className="text-md font-semibold mb-2 text-gray-700 dark:text-gray-200 uppercase">
                             {chart.yKey}
                         </h2>
-                        {/* ✅ Pass measurement and timeFilter down to RenderChart */}
-                        <RenderChart config={chart} devices={devices} measurement={measurement} timeFilter={timeFilter} />
+                        <RenderChart
+                            config={chart}
+                            devices={devices}
+                            measurement={measurement}
+                            timeFilter={timeFilter}
+                        />
                     </div>
                 ))}
                 {charts.length === 0 && (
@@ -221,6 +258,17 @@ export default function DynamicChartBuilder({
                     </div>
                 )}
             </div>
+
+            {/* ── ANALYTICS PANELS ─────────────────────────────────────────────
+                Sits below the charts grid. Receives the raw API response so it
+                can derive packet counts, zero readings, delays, and GPS events
+                without making additional API calls.
+            ─────────────────────────────────────────────────────────────────── */}
+            <AnalyticsPanels
+                rawApiResponse={rawApiResponse}
+                allFieldData={allFieldData}
+                devices={devices}
+            />
         </div>
     );
 }

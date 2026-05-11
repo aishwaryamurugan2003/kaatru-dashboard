@@ -193,6 +193,8 @@ const MultiDeviceDashboardPage: React.FC = () => {
           defaultChartType="line"
           measurement={measurement}
           timeFilter={selectedFilter}
+          isCustomFolder={true}
+          folderId={location.state?.folderId as number | undefined}
         />
       );
     }
