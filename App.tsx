@@ -19,6 +19,10 @@ import { apiService } from "./services/api";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import DashboardRealtimeDebugPage from "./pages/DashboardRealtimeDebug";
 import GroupRealtimeDetail from "./pages/GroupRealtimeDetail";
+import DeviceManagementPage from "./pages/DeviceManagementPage";
+import GroupManagementPage from "./pages/GroupManagementPage";
+import SensorConfigPage from "./pages/SensorConfigPage";
+import InfrastructurePage from "./pages/InfrastructurePage";
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -179,6 +183,54 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <OTAPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ---------- DEVICE MANAGEMENT ---------- */}
+        <Route
+          path="/devices"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <DeviceManagementPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ---------- GROUP MANAGEMENT ---------- */}
+        <Route
+          path="/groups"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <GroupManagementPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ---------- SENSOR CONFIGURATION ---------- */}
+        <Route
+          path="/sensors"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <SensorConfigPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ---------- INFRASTRUCTURE MANAGEMENT ---------- */}
+        <Route
+          path="/infrastructure"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <InfrastructurePage />
               </DashboardLayout>
             </ProtectedRoute>
           }
