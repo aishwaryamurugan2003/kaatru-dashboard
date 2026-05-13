@@ -20,8 +20,6 @@ interface RawDeviceData {
 interface AnalyticsPanelsProps {
     // Raw API response from fetchSensorData (the full object with .data array)
     rawApiResponse: { data: RawDeviceData[] } | null;
-    // All fields currently loaded (from all charts combined)
-    allFieldData: Record<string, TimeSeriesEntry[]>;
     devices: Array<{ label: string; value: string }>;
 }
 
@@ -39,7 +37,6 @@ function formatTs(srvtime: number): string {
 /* ─── AnalyticsPanels ────────────────────────────────────────────────────── */
 export default function AnalyticsPanels({
     rawApiResponse,
-    allFieldData,
     devices,
 }: AnalyticsPanelsProps) {
 

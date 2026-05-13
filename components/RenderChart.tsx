@@ -29,16 +29,19 @@ export function RenderChart({
   devices,
   measurement = "gurprod",
   timeFilter,
+  fullData,
 }: {
   config: ChartConfig;
   devices: any[];
   measurement?: string;
   timeFilter?: string;
+  fullData?: any[];
 }) {
   const { type, yKey } = config;
 
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Legend isolation: map of trace name → true means HIDDEN
   const [hiddenTraces, setHiddenTraces] = useState<Record<string, boolean>>({});
@@ -50,23 +53,33 @@ export function RenderChart({
 
   useEffect(() => {
     async function load() {
+      // If we have fullData, we don't need to fetch
+      if (fullData) {
+        const ts = convertToTimeSeries({ data: fullData }, yKey);
+        setData(ts);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+
       if (!yKey || yKey === "device" || devices.length === 0) return;
 
       setLoading(true);
+      setError(null);
       try {
         const deviceIds = devices.map((d: any) => d.value);
         const apiResponse = await fetchSensorData({ deviceIds, fields: yKey, measurement, timeFilter });
         const allData = convertToTimeSeries(apiResponse, yKey);
-        console.log(`CHART [${yKey}] measurement=${measurement} filter=${timeFilter} → ${allData.length} points`);
         setData(allData);
-      } catch (e) {
-        console.error("CRITICAL API ERROR", e);
+      } catch (e: any) {
+        console.error("CHART FETCH ERROR", e);
+        setError(e.message || "Failed to load data");
       }
       setLoading(false);
     }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [yKey, deviceKey, measurement, timeFilter]);
+  }, [yKey, deviceKey, measurement, timeFilter, fullData]);
 
   const handleRelayout = useCallback((event: any) => {
     if (event["xaxis.range[0]"] !== undefined && event["xaxis.range[1]"] !== undefined) {
@@ -109,9 +122,22 @@ export function RenderChart({
       </div>
     );
   }
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[300px] text-red-500 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-red-100 dark:border-red-900/30 p-4">
+        <p className="mb-2 font-medium">Error: {error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-4 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
   if (!data.length) {
     return (
-      <div className="flex items-center justify-center h-[300px] text-gray-500 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
+      <div className="flex items-center justify-center h-[300px] text-gray-400 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
         No data available
       </div>
     );

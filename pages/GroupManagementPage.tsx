@@ -8,6 +8,7 @@ import {
   UserDeleteOutlined,
 } from "@ant-design/icons";
 import { apiService, Endpoint } from "../services/api";
+import { getCache, setCache } from "../services/cache";
 import Loading from "../components/Loading";
 
 const { Option } = Select;
@@ -15,7 +16,9 @@ const { Option } = Select;
 const GroupManagementPage: React.FC = () => {
   const [groups, setGroups] = useState<any[]>([]);
   const [servers, setServers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
   const [currentGroup, setCurrentGroup] = useState<any>(null);
@@ -25,19 +28,41 @@ const GroupManagementPage: React.FC = () => {
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [form] = Form.useForm();
 
-  const fetchData = async () => {
+  const fetchData = async (force = false) => {
+    const cacheKeyGroups = 'groups';
+    const cacheKeyServers = 'infra_servers';
+
+    if (!force) {
+      const cachedGroups = getCache<any[]>(cacheKeyGroups);
+      const cachedServers = getCache<any[]>(cacheKeyServers);
+      if (cachedGroups && cachedServers && cachedGroups.length > 0 && cachedServers.length > 0) {
+        setGroups(cachedGroups);
+        setServers(cachedServers);
+        setInitialLoading(false);
+        return;
+      }
+    }
+
     try {
-      setLoading(true);
+      setInitialLoading(groups.length === 0 || servers.length === 0);
+      setRefreshing(groups.length > 0 || servers.length > 0);
       const [groupsRes, serversRes] = await Promise.all([
         apiService.get(Endpoint.GROUP_ALL),
         apiService.get(Endpoint.INFRA_SERVER_ALL),
       ]);
-      setGroups(Array.isArray(groupsRes?.data) ? groupsRes.data : []);
-      setServers(Array.isArray(serversRes?.data) ? serversRes.data : []);
-    } catch (error) {
+      const gResult = Array.isArray(groupsRes?.data) ? groupsRes.data : [];
+      const sResult = Array.isArray(serversRes?.data) ? serversRes.data : [];
+      setCache(cacheKeyGroups, gResult);
+      setCache(cacheKeyServers, sResult);
+      setGroups(gResult);
+      setServers(sResult);
+      setError(null);
+    } catch (err) {
       message.error("Failed to fetch groups or servers");
+      setError("Failed to load data. Please try again.");
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -193,12 +218,21 @@ const GroupManagementPage: React.FC = () => {
     },
   ];
 
-  if (loading) return <Loading fullScreen text="Loading groups..." />;
+  if (initialLoading) return <Loading fullScreen text="Loading groups..." />;
 
   return (
     <div className="p-6">
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex justify-between mb-4">
+          <span className="text-red-600">{error}</span>
+          <button onClick={() => window.location.reload()} className="text-red-600 underline text-sm">Retry</button>
+        </div>
+      )}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Group Management</h1>
+        <h1 className="text-2xl font-bold text-gray-800 flex items-center">
+          Group Management
+          {refreshing && <div className="ml-4 animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full" />}
+        </h1>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleAddGroup}>
           Add Group
         </Button>

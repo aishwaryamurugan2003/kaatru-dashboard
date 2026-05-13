@@ -511,6 +511,7 @@ export const Endpoint = {
   DEVICE_INFO: "https://bw04.kaatru.org/device",
   GROUP: "https://bw04.kaatru.org/group",
   GROUP_DEVICE: "https://bw04.kaatru.org/group/device",
+  GROUP_DEVICES: "https://bw04.kaatru.org/group",
   SENSOR_GROUP_ALL: "https://bw04.kaatru.org/sensor/group/all",
   SENSOR_GROUP: "https://bw04.kaatru.org/sensor/group",
   SENSOR_BRAND_ALL: "https://bw04.kaatru.org/sensor/brand/all",
@@ -902,9 +903,20 @@ export async function fetchSensorData({
   });
 
   const queryString = `device_id=${deviceIds.join(",")}&${baseParams.toString()}`;
-  const res = await fetch(`${SENSOR_API_BASE}/data?${queryString}`);
-  if (!res.ok) return { data: [] };
-  return res.json();
+  const url = `${SENSOR_API_BASE}/data?${queryString}`;
+  
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+        const errorText = await res.text().catch(() => "No error body");
+        console.error(`🔴 API Error ${res.status} [${url}]:`, errorText);
+        throw new Error(`Failed to fetch sensor data: ${res.status}`);
+    }
+    return res.json();
+  } catch (err: any) {
+    console.error(`🔴 Fetch Exception [${url}]:`, err);
+    throw err;
+  }
 }
 
 export async function fetchFields() {

@@ -2,41 +2,59 @@ import React, { useEffect, useState } from "react";
 import { Table, Button, Modal, Form, Input, Space, message, Tabs, Tag } from "antd";
 import { EditOutlined, PlusOutlined, GlobalOutlined, WifiOutlined } from "@ant-design/icons";
 import { apiService, Endpoint } from "../services/api";
+import { getCache, setCache } from "../services/cache";
 import Loading from "../components/Loading";
 
 const InfrastructurePage: React.FC = () => {
   const [servers, setServers] = useState<any[]>([]);
   const [wifiProfiles, setWifiProfiles] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("servers");
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [form] = Form.useForm();
 
-  const fetchServers = async () => {
+  const fetchData = async (force = false) => {
+    const cacheKeyServers = 'infra_servers';
+    const cacheKeyWifi = 'infra_wifi';
+
+    if (!force) {
+      const cachedServers = getCache<any[]>(cacheKeyServers);
+      const cachedWifi = getCache<any[]>(cacheKeyWifi);
+      if (cachedServers) {           // ← don't require wifi to also be non-empty
+        setServers(cachedServers);
+        setWifiProfiles(cachedWifi ?? []);
+        setInitialLoading(false);
+        return;
+      }
+    }
+
     try {
-      const res = await apiService.get(Endpoint.INFRA_SERVER_ALL);
-      setServers(Array.isArray(res?.data) ? res.data : []);
-    } catch (error) {
-      message.error("Failed to fetch node servers");
+      // ← don't read stale `servers`/`wifiProfiles` state here
+      setInitialLoading(true);
+      const [serversRes, wifiRes] = await Promise.all([
+        apiService.get(Endpoint.INFRA_SERVER_ALL),
+        apiService.get(Endpoint.INFRA_WIFI_ALL),
+      ]);
+      const sResult = (Array.isArray(serversRes?.data) ? serversRes.data : [])
+        .filter((s: any) => s.id !== "NULL");
+      const wResult = Array.isArray(wifiRes?.data) ? wifiRes.data : [];
+
+      setCache(cacheKeyServers, sResult);
+      setCache(cacheKeyWifi, wResult);
+      setServers(sResult);
+      setWifiProfiles(wResult);
+      setError(null);
+    } catch (err) {
+      message.error("Failed to load infrastructure data");
+      setError("Failed to load data. Please try again.");
+    } finally {
+      setInitialLoading(false);
+      setRefreshing(false);
     }
   };
-
-  const fetchWifi = async () => {
-    try {
-      const res = await apiService.get(Endpoint.INFRA_WIFI_ALL);
-      setWifiProfiles(Array.isArray(res?.data) ? res.data : []);
-    } catch (error) {
-      message.error("Failed to fetch WiFi profiles");
-    }
-  };
-
-  const fetchData = async () => {
-    setLoading(true);
-    await Promise.all([fetchServers(), fetchWifi()]);
-    setLoading(false);
-  };
-
   useEffect(() => {
     fetchData();
   }, []);
@@ -193,12 +211,21 @@ const InfrastructurePage: React.FC = () => {
     },
   ];
 
-  if (loading) return <Loading fullScreen text="Loading infrastructure..." />;
+  if (initialLoading) return <Loading fullScreen text="Loading infrastructure..." />;
 
   return (
     <div className="p-6">
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex justify-between mb-4">
+          <span className="text-red-600">{error}</span>
+          <button onClick={() => window.location.reload()} className="text-red-600 underline text-sm">Retry</button>
+        </div>
+      )}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Infrastructure Management</h1>
+        <h1 className="text-2xl font-bold text-gray-800 flex items-center">
+          Infrastructure Management
+          {refreshing && <div className="ml-4 animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full" />}
+        </h1>
       </div>
 
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">

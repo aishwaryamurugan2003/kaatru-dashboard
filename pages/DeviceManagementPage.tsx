@@ -7,6 +7,7 @@ import {
   EditOutlined, DeleteOutlined, PlusOutlined,
 } from "@ant-design/icons";
 import { apiService, Endpoint } from "../services/api";
+import { getCache, setCache } from "../services/cache";
 import Loading from "../components/Loading";
 
 const { Option } = Select;
@@ -15,7 +16,9 @@ const DeviceManagementPage: React.FC = () => {
   const [devices, setDevices] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [sensorGroups, setSensorGroups] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isDetailVisible, setIsDetailVisible] = useState(false);
   const [currentDevice, setCurrentDevice] = useState<any>(null);
@@ -24,22 +27,51 @@ const DeviceManagementPage: React.FC = () => {
 
   // There is no "all devices" endpoint — we show groups list as the main table
   // and let users look up individual devices by ID
-  const fetchGroups = async () => {
+  const fetchGroups = async (force = false) => {
+    const cacheKey = 'groups';
+
+    if (!force) {
+      const cached = getCache<any[]>(cacheKey);
+      if (cached && cached.length > 0) {
+        setGroups(cached);
+        setInitialLoading(false);
+        return;
+      }
+    }
+
     try {
-      setLoading(true);
+      setInitialLoading(groups.length === 0);
+      setRefreshing(groups.length > 0);
       const res = await apiService.get(Endpoint.GROUP_ALL);
-      setGroups(Array.isArray(res?.data) ? res.data : []);
-    } catch (error) {
+      const result = Array.isArray(res?.data) ? res.data : [];
+      setCache(cacheKey, result);
+      setGroups(result);
+      setError(null);
+    } catch (err) {
       message.error("Failed to fetch groups");
+      setError("Failed to load data. Please try again.");
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const fetchSensorGroups = async () => {
+  const fetchSensorGroups = async (force = false) => {
+    const cacheKey = 'sensor_groups';
+    
+    if (!force) {
+      const cached = getCache<any[]>(cacheKey);
+      if (cached && cached.length > 0) {
+        setSensorGroups(cached);
+        return;
+      }
+    }
+
     try {
       const res = await apiService.get(Endpoint.SENSOR_GROUP_ALL);
-      setSensorGroups(Array.isArray(res?.data) ? res.data : []);
+      const result = Array.isArray(res?.data) ? res.data : [];
+      setCache(cacheKey, result);
+      setSensorGroups(result);
     } catch (error) {
       console.error("Failed to fetch sensor groups", error);
     }
@@ -157,12 +189,21 @@ const DeviceManagementPage: React.FC = () => {
     { title: "MQTT Topic", dataIndex: "mqtt_topic", key: "mqtt_topic" },
   ];
 
-  if (loading) return <Loading fullScreen text="Loading..." />;
+  if (initialLoading) return <Loading fullScreen text="Loading devices..." />;
 
   return (
     <div className="p-6">
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex justify-between mb-4">
+          <span className="text-red-600">{error}</span>
+          <button onClick={() => window.location.reload()} className="text-red-600 underline text-sm">Retry</button>
+        </div>
+      )}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Device Management</h1>
+        <h1 className="text-2xl font-bold text-gray-800 flex items-center">
+          Device Management
+          {refreshing && <div className="ml-4 animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full" />}
+        </h1>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleRegister}>
           Register Device
         </Button>

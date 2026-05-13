@@ -2,38 +2,73 @@ import React, { useEffect, useState } from "react";
 import { Table, Button, Modal, Form, Input, Space, message, Tabs } from "antd";
 import { EditOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { apiService, Endpoint } from "../services/api";
+import { getCache, setCache } from "../services/cache";
+import Loading from "../components/Loading";
 
 const SensorConfigPage: React.FC = () => {
   const [sensorGroups, setSensorGroups] = useState<any[]>([]);
   const [sensorBrands, setSensorBrands] = useState<any[]>([]);
-  const [loadingGroups, setLoadingGroups] = useState(false);
-  const [loadingBrands, setLoadingBrands] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState("groups");
   const [editingItem, setEditingItem] = useState<any>(null);
   const [form] = Form.useForm();
 
-  const fetchSensorGroups = async () => {
+  const fetchSensorGroups = async (force = false) => {
+    const cacheKey = 'sensor_groups';
+    if (!force) {
+      const cached = getCache<any[]>(cacheKey);
+      if (cached && cached.length > 0) {
+        setSensorGroups(cached);
+        setInitialLoading(false);
+        return;
+      }
+    }
+
     try {
-      setLoadingGroups(true);
+      setInitialLoading(sensorGroups.length === 0);
+      setRefreshing(sensorGroups.length > 0);
       const res = await apiService.get(Endpoint.SENSOR_GROUP_ALL);
-      setSensorGroups(Array.isArray(res?.data) ? res.data : []);
-    } catch (error) {
+      const result = Array.isArray(res?.data) ? res.data : [];
+      setCache(cacheKey, result);
+      setSensorGroups(result);
+      setError(null);
+    } catch (err) {
       message.error("Failed to fetch sensor groups");
+      setError("Failed to load data. Please try again.");
     } finally {
-      setLoadingGroups(false);
+      setInitialLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const fetchSensorBrands = async () => {
+  const fetchSensorBrands = async (force = false) => {
+    const cacheKey = 'sensor_brands';
+    if (!force) {
+      const cached = getCache<any[]>(cacheKey);
+      if (cached && cached.length > 0) {
+        setSensorBrands(cached);
+        setInitialLoading(false);
+        return;
+      }
+    }
+
     try {
-      setLoadingBrands(true);
+      setInitialLoading(sensorBrands.length === 0);
+      setRefreshing(sensorBrands.length > 0);
       const res = await apiService.get(Endpoint.SENSOR_BRAND_ALL);
-      setSensorBrands(Array.isArray(res?.data) ? res.data : []);
-    } catch (error) {
+      const result = Array.isArray(res?.data) ? res.data : [];
+      setCache(cacheKey, result);
+      setSensorBrands(result);
+      setError(null);
+    } catch (err) {
       message.error("Failed to fetch sensor brands");
+      setError("Failed to load data. Please try again.");
     } finally {
-      setLoadingBrands(false);
+      setInitialLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -150,7 +185,7 @@ const SensorConfigPage: React.FC = () => {
             dataSource={sensorGroups}
             columns={groupColumns}
             rowKey="id"
-            loading={loadingGroups}
+            loading={refreshing}
             pagination={{ pageSize: 10 }}
           />
         </>
@@ -170,7 +205,7 @@ const SensorConfigPage: React.FC = () => {
             dataSource={sensorBrands}
             columns={brandColumns}
             rowKey="id"
-            loading={loadingBrands}
+            loading={refreshing}
             pagination={{ pageSize: 10 }}
           />
         </>
@@ -178,10 +213,21 @@ const SensorConfigPage: React.FC = () => {
     },
   ];
 
+  if (initialLoading) return <Loading fullScreen text="Loading sensor configs..." />;
+
   return (
     <div className="p-6">
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex justify-between mb-4">
+          <span className="text-red-600">{error}</span>
+          <button onClick={() => window.location.reload()} className="text-red-600 underline text-sm">Retry</button>
+        </div>
+      )}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Sensor Configuration</h1>
+        <h1 className="text-2xl font-bold text-gray-800 flex items-center">
+          Sensor Configuration
+          {refreshing && <div className="ml-4 animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full" />}
+        </h1>
       </div>
 
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">

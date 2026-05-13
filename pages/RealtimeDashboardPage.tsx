@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { apiService, Endpoint } from "../services/api";
+import { getCache, setCache } from "../services/cache";
 import { useRealtimeDevices } from "../hooks/useRealtimeDevices";
 import RealtimeMapAll from "@/components/RealtimeMapAll";
 import Loading from "../components/Loading";
@@ -39,9 +40,11 @@ function calculateAverages(devices: Record<string, any>) {
 const RealtimeDashboardPage: React.FC = () => {
   const [groups, setGroups] = useState<any[]>([]);
   const [selectedGroup, setSelectedGroup] = useState("");
-  const [groupDevices, setGroupDevices] = useState<string[]>([]);
+  const [groupDevices, setGroupDevices] = useState<any[]>([]);
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [realtimeTimeout, setRealtimeTimeout] = useState(false);
   const [showVisualization, setShowVisualization] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -256,15 +259,32 @@ const RealtimeDashboardPage: React.FC = () => {
 
   // fetch groups
   useEffect(() => {
-    const fetchGroups = async () => {
+    const fetchGroups = async (force = false) => {
+      const cacheKey = 'groups';
+
+      if (!force) {
+        const cached = getCache<any[]>(cacheKey);
+        if (cached && cached.length > 0) {
+          setGroups(cached);
+          setInitialLoading(false);
+          return;
+        }
+      }
+
       try {
-        setLoading(true);
+        setInitialLoading(groups.length === 0);
+        setRefreshing(groups.length > 0);
         const res: any = await apiService.get(Endpoint.GROUP_ALL);
-        setGroups(Array.isArray(res.data) ? res.data : res.data.group || []);
+        const result = Array.isArray(res?.data) ? res.data : (res?.data?.group || []);
+        setCache(cacheKey, result);
+        setGroups(result);
+        setError(null);
       } catch (err) {
         console.error("Failed to load groups", err);
+        setError("Failed to load data. Please try again.");
       } finally {
-        setLoading(false);
+        setInitialLoading(false);
+        setRefreshing(false);
       }
     };
     fetchGroups();
@@ -288,45 +308,51 @@ const RealtimeDashboardPage: React.FC = () => {
   useEffect(() => {
     if (!selectedGroup) return;
 
-    const fetchDevices = async () => {
+    const fetchGroupDevices = async (force = false) => {
+      const cacheKey = `group_devices_${selectedGroup}`;
+
+      if (!force) {
+        const cached = getCache<any[]>(cacheKey);
+        if (cached && cached.length > 0) {
+          setGroupDevices(cached);
+          setSelectedDevices(cached.map(d => d.id));
+          setSelectedDeviceId(null);
+          setAutoRotate(true);
+          setFlipped(false);
+          setActiveIndex(0);
+          setInitialLoading(false);
+          return;
+        }
+      }
+
       try {
-        setLoading(true);
-        const res: any = await apiService.get(
-          Endpoint.GROUP_DEVICES,
-          { id: selectedGroup }
-        );
+        setInitialLoading(groupDevices.length === 0);
+        setRefreshing(groupDevices.length > 0);
+        const res: any = await apiService.get(Endpoint.GROUP_DEVICES, { id: selectedGroup });
 
-        const devs = res.data.devices || [];
-        const deviceDetails = await Promise.all(
-          devs.map(async (id: string) => {
-            try {
-              const res = await apiService.get("/device", { id });
+        const devs = Array.isArray(res?.data?.devices) ? res.data.devices : [];
+        const deviceDetails = devs.map((id: string) => ({
+          id,
+          type: id.toUpperCase().startsWith("M") ? "mobile" : "stationary",
+        }));
 
-              const d = res.data.device?.[0];
-              const typeStr = d?.deviceType || d?.device_type || d?.type;
-
-              return {
-                id,
-                type: typeStr ? typeStr.toLowerCase() : (id.toUpperCase().startsWith("M") ? "mobile" : "stationary"),
-              };
-            } catch {
-              return { id, type: id.toUpperCase().startsWith("M") ? "mobile" : "stationary" };
-            }
-          })
-        );
+        setCache(cacheKey, deviceDetails);
         setGroupDevices(deviceDetails);
         setSelectedDevices(deviceDetails.map(d => d.id));
         setSelectedDeviceId(null);
         setAutoRotate(true);
         setFlipped(false);
         setActiveIndex(0);
+        setError(null);
       } catch (err) {
         console.error("Failed to load group devices", err);
+        setError("Failed to load devices. Please try again.");
       } finally {
-        setLoading(false);
+        setInitialLoading(false);
+        setRefreshing(false);
       }
     };
-    fetchDevices();
+    fetchGroupDevices();
   }, [selectedGroup]);
 
   function toggleDevice(id: string) {
@@ -338,7 +364,7 @@ const RealtimeDashboardPage: React.FC = () => {
   }
 
   // loading states
-  if (loading) {
+  if (initialLoading) {
     return <Loading fullScreen text="Loading realtime dashboard..." />;
   }
 
@@ -358,8 +384,16 @@ const RealtimeDashboardPage: React.FC = () => {
 
   return (
     <div className="p-6 space-y-4 bg-gray-50 dark:bg-gray-900">
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex justify-between">
+          <span className="text-red-600">{error}</span>
+          <button onClick={() => window.location.reload()} className="text-red-600 underline text-sm">Retry</button>
+        </div>
+      )}
+      
       {/* TOP FILTER BAR */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 bg-white dark:bg-gray-800 p-3 rounded-xl shadow relative">
+        {refreshing && <div className="absolute right-4 top-4 animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full" />}
         <Select
           options={groups.map((g: any) => ({
             label: g.name,

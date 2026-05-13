@@ -55,7 +55,8 @@ export default function DynamicChartBuilder({
 
     // ── Analytics state ──────────────────────────────────────────────────────
     const [rawApiResponse, setRawApiResponse] = useState<{ data: any[] } | null>(null);
-    const [allFieldData, setAllFieldData] = useState<Record<string, TimeSeriesEntry[]>>({});
+    const [pageLoading, setPageLoading] = useState(false);
+    const [pageError, setPageError] = useState<string | null>(null);
     const analyticsLoadedRef = useRef(false);
 
     // ── Load charts from localStorage ───────────────────────────────────────
@@ -92,29 +93,36 @@ export default function DynamicChartBuilder({
         }
     }, [charts, STORAGE_KEY]);
 
-    // ── Fetch raw API response for AnalyticsPanels ───────────────────────────
-    // We fetch once whenever devices or timeFilter changes.
+    // ── Fetch ALL fields in one go for efficiency ───────────────────────────
     useEffect(() => {
-        if (!devices.length) return;
+        if (!devices.length) {
+            setRawApiResponse(null);
+            return;
+        }
 
-        async function loadAnalytics() {
+        async function loadAllData() {
+            setPageLoading(true);
+            setPageError(null);
             try {
                 const deviceIds = devices.map((d: any) => d.value);
-                // Fetch a representative field; AnalyticsPanels uses the raw response
-                // shape (rawApiResponse.data[].data[]) so any field works.
+                const allFields = fields.join(",");
+                
                 const response = await fetchSensorData({
                     deviceIds,
-                    fields: "sPM2",
+                    fields: allFields,
                     measurement,
                     timeFilter,
                 });
                 setRawApiResponse(response);
-            } catch (e) {
-                console.error("Analytics fetch error", e);
+            } catch (e: any) {
+                console.error("Dashboard data fetch error", e);
+                setPageError(e.message || "Failed to load dashboard data");
+            } finally {
+                setPageLoading(false);
             }
         }
 
-        loadAnalytics();
+        loadAllData();
     }, [devices.map((d) => d.value).join(","), measurement, timeFilter]);
 
     // ── Chart management ─────────────────────────────────────────────────────
@@ -229,7 +237,27 @@ export default function DynamicChartBuilder({
             )}
 
             {/* ── CHARTS GRID ─────────────────────────────────────────────────── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full relative">
+                {pageLoading && (
+                    <div className="absolute inset-x-0 -top-4 flex justify-center z-50">
+                        <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-xs animate-bounce shadow-lg">
+                            Refreshing Data...
+                        </div>
+                    </div>
+                )}
+
+                {pageError && (
+                    <div className="col-span-full bg-red-50 border border-red-200 p-4 rounded-xl flex justify-between items-center mb-4">
+                        <span className="text-red-600 font-medium">Error: {pageError}</span>
+                        <button 
+                            onClick={() => window.location.reload()}
+                            className="bg-red-600 text-white px-4 py-1 rounded-lg text-sm hover:bg-red-700"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                )}
+
                 {charts.map((chart) => (
                     <div
                         key={chart.id}
@@ -249,6 +277,7 @@ export default function DynamicChartBuilder({
                             devices={devices}
                             measurement={measurement}
                             timeFilter={timeFilter}
+                            fullData={rawApiResponse?.data}
                         />
                     </div>
                 ))}
@@ -266,7 +295,6 @@ export default function DynamicChartBuilder({
             ─────────────────────────────────────────────────────────────────── */}
             <AnalyticsPanels
                 rawApiResponse={rawApiResponse}
-                allFieldData={allFieldData}
                 devices={devices}
             />
         </div>
