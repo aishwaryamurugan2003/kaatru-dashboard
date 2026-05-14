@@ -1,18 +1,20 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { apiService, Endpoint } from "../services/api";
+import { getCache, setCache } from "../services/cache";
 import DynamicChartBuilder from "../components/DynamicChartBuilder";
+import Loading from "../components/Loading";
 import RealTimeDashboardView from "../components/dashboards/RealTimeDashboardView";
 import SingleDeviceDashboardView from "../components/dashboards/SingleDeviceDashboardView";
 import { ArrowLeftOutlined, FolderOpenOutlined } from "@ant-design/icons";
 import Select from "react-select";
 
-// Cache to avoid refetch
-const deviceCache: Record<string, string[]> = {};
-const measurementCache: Record<string, string> = {};
+// Cache is imported from services/cache.ts
 
+// Values that mean "no real DB configured"
 const INVALID_DB_VALUES = new Set([
-  "string", "null", "NULL", "", "admin", "NR1", "NR2",
+  "string", "null", "NULL", "", "admin", "ADMIN",
+  "nr1", "NR1", "nr2", "NR2", "undefined", "none",
 ]);
 
 function isMobileDevice(id: string): boolean {
@@ -24,11 +26,25 @@ function isStationaryDevice(id: string): boolean {
   return !isMobileDevice(id);
 }
 
+/**
+ * Resolve the InfluxDB measurement name from group info.
+ * Falls back to "gurprod" (the most common default in this system).
+ * If your group uses "sendata" or another name, it must be set in primarydb.
+ */
 function resolveMeasurement(groupInfo: any): string {
-  if (!groupInfo) return "sendata";
-  const primary = groupInfo.primarydb?.toLowerCase();
-  if (primary && primary !== "string") return primary;
-  return "sendata";
+  if (!groupInfo) return "gurprod";
+
+  const primary = groupInfo.primarydb?.trim();
+
+  // If primarydb is set and is a real value, use it (case-preserved)
+  if (primary && !INVALID_DB_VALUES.has(primary) && !INVALID_DB_VALUES.has(primary.toLowerCase())) {
+    console.log(`✅ Using primarydb as measurement: "${primary}"`);
+    return primary;
+  }
+
+  // Fallback
+  console.warn(`⚠️ primarydb="${primary}" is invalid — falling back to "gurprod"`);
+  return "gurprod";
 }
 
 const MultiDeviceDashboardPage: React.FC = () => {
@@ -47,17 +63,16 @@ const MultiDeviceDashboardPage: React.FC = () => {
 
   const folderName: string = location.state?.folderName || "My Folder";
 
-  // ── Resolve the actual dashboard type for custom folders ─────────────────
   // Custom folders always behave like multi-device-dashboard-stationary-device
-  // (all devices, line chart) unless you want to store a type per folder.
   const effectiveDashboardType = isCustomFolder
     ? "multi-device-dashboard-stationary-device"
     : dashboardType;
 
   const [allDevicesList, setAllDevicesList] = useState<string[]>([]);
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
-  const [measurement, setMeasurement] = useState<string>("sendata");
-  const [loading, setLoading] = useState(true);
+  const [measurement, setMeasurement] = useState<string>("gurprod");
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState("3H");
 
@@ -71,59 +86,72 @@ const MultiDeviceDashboardPage: React.FC = () => {
   ];
 
   useEffect(() => {
-    async function loadDevices() {
+    async function loadDevices(force = false) {
       if (!groupId) return;
 
+      const cacheKeyDevices = `devices_${groupId}`;
+      const cacheKeyMeasure = `measure_${groupId}`;
+
+      if (!force) {
+        const cachedDevices = getCache<string[]>(cacheKeyDevices);
+        const cachedMeasure = getCache<string>(cacheKeyMeasure);
+        if (cachedDevices && cachedMeasure) {
+          applyDeviceFilter(cachedDevices, cachedMeasure);
+          setInitialLoading(false);
+          return;
+        }
+      }
+
       try {
-        setLoading(true);
+        setInitialLoading(allDevicesList.length === 0);
+        setRefreshing(allDevicesList.length > 0);
         setError(null);
 
         let allDeviceIds: string[] = [];
-        let resolvedMeasurement = "sendata";
+        let resolvedMeasurement = "gurprod";
 
-        if (deviceCache[groupId]) {
-          allDeviceIds = deviceCache[groupId];
-          resolvedMeasurement = measurementCache[groupId] ?? "sendata";
-        } else {
-          const res = await apiService.get(Endpoint.GROUP_DEVICES, { id: groupId });
-          allDeviceIds = res?.data?.devices || [];
-          deviceCache[groupId] = allDeviceIds;
+        // Fetch from backend
+        const res = await apiService.get(Endpoint.GROUP, { id: groupId });
+        const data = res?.data;
 
-          const groupInfo = res?.data?.group?.[0];
-          resolvedMeasurement = resolveMeasurement(groupInfo);
-          measurementCache[groupId] = resolvedMeasurement;
+        allDeviceIds = Array.isArray(data?.devices) ? data.devices : [];
+        const groupInfo = Array.isArray(data?.group)
+          ? data.group[0]
+          : data?.group ?? null;
 
-          console.log(
-            `📦 Group "${groupId}" | primarydb="${groupInfo?.primarydb}" | ✅ resolved="${resolvedMeasurement}"`
-          );
-        }
+        resolvedMeasurement = resolveMeasurement(groupInfo);
+        
+        setCache(cacheKeyDevices, allDeviceIds);
+        setCache(cacheKeyMeasure, resolvedMeasurement);
 
-        setMeasurement(resolvedMeasurement);
-
-        // ── Filter by effective dashboard type ────────────────────────────
-        let initialFilter = allDeviceIds;
-        if (effectiveDashboardType?.includes("mobile")) {
-          initialFilter = allDeviceIds.filter(isMobileDevice);
-        } else if (effectiveDashboardType?.includes("stationary")) {
-          initialFilter = allDeviceIds.filter(isStationaryDevice);
-        }
-
-        // For custom folders: show ALL devices (user picks)
-        if (isCustomFolder) initialFilter = allDeviceIds;
-
-        setAllDevicesList(initialFilter);
-
-        let initialSelection = initialFilter.slice(0, 10);
-        if (effectiveDashboardType?.includes("single-device")) {
-          initialSelection = initialFilter.length > 0 ? [initialFilter[0]] : [];
-        }
-        setSelectedDevices(initialSelection);
+        applyDeviceFilter(allDeviceIds, resolvedMeasurement);
       } catch (err) {
-        console.error("Failed to fetch devices", err);
-        setError("Failed to load devices");
+        console.error("Failed to fetch group devices:", err);
+        setError("Failed to load devices. Please try again.");
       } finally {
-        setLoading(false);
+        setInitialLoading(false);
+        setRefreshing(false);
       }
+    }
+
+    function applyDeviceFilter(allDeviceIds: string[], resolvedMeasurement: string) {
+      setMeasurement(resolvedMeasurement);
+      let initialFilter = allDeviceIds;
+      if (effectiveDashboardType?.includes("mobile")) {
+        initialFilter = allDeviceIds.filter(isMobileDevice);
+      } else if (effectiveDashboardType?.includes("stationary")) {
+        initialFilter = allDeviceIds.filter(isStationaryDevice);
+      }
+
+      if (isCustomFolder) initialFilter = allDeviceIds;
+
+      setAllDevicesList(initialFilter);
+
+      let initialSelection = initialFilter.slice(0, 10);
+      if (effectiveDashboardType?.includes("single-device")) {
+        initialSelection = initialFilter.length > 0 ? [initialFilter[0]] : [];
+      }
+      setSelectedDevices(initialSelection);
     }
 
     loadDevices();
@@ -183,7 +211,6 @@ const MultiDeviceDashboardPage: React.FC = () => {
 
   // ── Render dashboard view ─────────────────────────────────────────────────
   const renderDashboardView = () => {
-    // Custom folders always use DynamicChartBuilder (line charts, all devices)
     if (isCustomFolder) {
       return (
         <DynamicChartBuilder
@@ -252,25 +279,39 @@ const MultiDeviceDashboardPage: React.FC = () => {
   return (
     <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen flex flex-col">
       <div className="flex-1">
-        {loading ? (
-          <div className="h-[320px] flex items-center justify-center bg-white p-6 rounded-xl shadow-sm border">
-            Loading devices...
-          </div>
+        {initialLoading ? (
+          <Loading fullScreen text="Loading devices..." />
         ) : error ? (
-          <div className="h-[320px] flex items-center justify-center text-red-500 bg-white p-6 rounded-xl shadow-sm border">
-            {error}
+          <div className="h-[320px] flex items-center justify-center bg-white p-6 rounded-xl shadow-sm border">
+            <div className="text-center">
+              <p className="text-red-500 mb-3">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+              >
+                Retry
+              </button>
+            </div>
           </div>
         ) : allDevicesList.length === 0 ? (
           <div className="h-[320px] flex items-center justify-center bg-white p-6 rounded-xl shadow-sm border">
-            No devices found in this group.
+            <div className="text-center text-gray-400">
+              <p className="text-lg mb-1">No devices found</p>
+              <p className="text-sm">Group "{groupId}" has no assigned devices.</p>
+            </div>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
             {/* DEVICE SELECTOR + TIME FILTER */}
             <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow border dark:border-gray-700 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
               <div className="flex flex-col md:flex-row items-center gap-4">
-                <span className="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap pl-2">
+                <span className="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap pl-2 flex items-center">
                   Select Devices
+                  {refreshing && <div className="ml-2 animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />}
+                </span>
+                {/* Measurement badge — helps debug */}
+                <span className="text-xs bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full font-mono">
+                  {measurement}
                 </span>
                 <div className="w-full md:w-80">
                   <Select

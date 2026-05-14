@@ -15,10 +15,15 @@ import DataDownloader from "./pages/DataDownloaderPage"; // adjust path
 import OTAPage from "./pages/OTAPage";
 import MultiDeviceDashboardPage from "./pages/MultiDeviceDashboardPage";
 import { isTokenAlive } from "./utils/token";
-import { apiService } from "./services/api";
+import { apiService, Endpoint } from "./services/api";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import DashboardRealtimeDebugPage from "./pages/DashboardRealtimeDebug";
 import GroupRealtimeDetail from "./pages/GroupRealtimeDetail";
+import DeviceManagementPage from "./pages/DeviceManagementPage";
+import GroupManagementPage from "./pages/GroupManagementPage";
+import SensorConfigPage from "./pages/SensorConfigPage";
+import InfrastructurePage from "./pages/InfrastructurePage";
+import { setCache } from "./services/cache";
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -33,6 +38,13 @@ function App() {
       apiService.clearToken();
       console.log("❌ Token expired or missing");
     }
+
+    // Prefetch groups for performance optimization
+    apiService.get(Endpoint.GROUP_ALL)
+      .then(res => {
+        setCache('groups', Array.isArray(res?.data) ? res.data : []);
+      })
+      .catch(err => console.error("Failed to prefetch groups", err));
   }, []);
 
   const DashboardLayout = ({ children }: { children: React.ReactNode }) => (
@@ -179,6 +191,54 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <OTAPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ---------- DEVICE MANAGEMENT ---------- */}
+        <Route
+          path="/devices"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <DeviceManagementPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ---------- GROUP MANAGEMENT ---------- */}
+        <Route
+          path="/groups"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <GroupManagementPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ---------- SENSOR CONFIGURATION ---------- */}
+        <Route
+          path="/sensors"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <SensorConfigPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ---------- INFRASTRUCTURE MANAGEMENT ---------- */}
+        <Route
+          path="/infrastructure"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <InfrastructurePage />
               </DashboardLayout>
             </ProtectedRoute>
           }

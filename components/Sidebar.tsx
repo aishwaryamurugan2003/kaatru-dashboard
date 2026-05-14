@@ -1,6 +1,13 @@
 import React, { useRef } from "react";
 import { NavLink } from "react-router-dom";
 import { VscDebugAlt } from "react-icons/vsc";
+import { 
+  DatabaseOutlined, 
+  SettingOutlined, 
+  ClusterOutlined, 
+  AppstoreOutlined,
+  GlobalOutlined
+} from "@ant-design/icons";
 
 
 interface SidebarProps {
@@ -259,6 +266,36 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
             icon={
               <VscDebugAlt />
             }
+          />
+
+          <div className="my-2 border-t border-gray-100 dark:border-gray-700 mx-3" />
+
+          <NavItem
+            to="/devices"
+            isExpanded={isOpen}
+            label="Device Management"
+            icon={<AppstoreOutlined className="text-xl" />}
+          />
+
+          <NavItem
+            to="/groups"
+            isExpanded={isOpen}
+            label="Group Management"
+            icon={<ClusterOutlined className="text-xl" />}
+          />
+
+          <NavItem
+            to="/sensors"
+            isExpanded={isOpen}
+            label="Sensor Settings"
+            icon={<SettingOutlined className="text-xl" />}
+          />
+
+          <NavItem
+            to="/infrastructure"
+            isExpanded={isOpen}
+            label="Infrastructure"
+            icon={<GlobalOutlined className="text-xl" />}
           />
 
         </ul>

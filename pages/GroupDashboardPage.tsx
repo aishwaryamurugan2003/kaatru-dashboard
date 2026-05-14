@@ -122,7 +122,7 @@ const GroupDashboardPage: React.FC = () => {
     if (!groupId) return;
     const load = async () => {
       try {
-        const res = await apiService.get(Endpoint.GROUP_DEVICES, {
+        const res = await apiService.get(Endpoint.GROUP_DEVICE, {
           id: groupId,
         });
         setDevices(res.data?.devices || []);

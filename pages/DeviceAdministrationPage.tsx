@@ -3,6 +3,7 @@ import { Table, Tooltip } from "antd";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { apiService } from "../services/api";
 import { Endpoint } from "../services/api";
+import { getCache, setCache } from "../services/cache";
 import AddPermissionModal from "../components/AddPermissionModal";
 import EditPermissionModal from "../components/EditPermissionModal";
 import Loading from "../components/Loading";
@@ -13,12 +14,26 @@ const DeviceAdministrationPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editUser, setEditUser] = useState<any>(null);
   const [searchText, setSearchText] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (force = false) => {
+    const cacheKey = 'users';
+    
+    if (!force) {
+      const cached = getCache<any[]>(cacheKey);
+      if (cached && cached.length > 0) {
+        setUsers(cached);
+        setInitialLoading(false);
+        return;
+      }
+    }
+
     try {
-      setLoading(true);
+      setInitialLoading(users.length === 0);
+      setRefreshing(users.length > 0);
       const res = await apiService.get(Endpoint.ACCESS_MANAGEMENT);
       const data = res?.data;
 
@@ -29,20 +44,24 @@ const DeviceAdministrationPage: React.FC = () => {
           username: u.username || "",
           email: u.email || "",
           groups: Array.isArray(u.access)
-            ? u.access.map((g) => g?.group_name || "").join(", ")
+            ? u.access.map((g: any) => g?.group_name || "").join(", ")
             : "",
           access: Array.isArray(u.access) ? u.access : [],
         }));
 
+        setCache(cacheKey, normalized);
         setUsers(normalized);
+        setError(null);
       } else {
         setUsers([]);
       }
-    } catch (error) {
-      console.log("ACCESS MGMT ERROR:", error);
+    } catch (err) {
+      console.log("ACCESS MGMT ERROR:", err);
+      setError("Failed to load data. Please try again.");
       setUsers([]);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -190,7 +209,7 @@ const DeviceAdministrationPage: React.FC = () => {
       </div>
     );
   };
-  if (loading) {
+  if (initialLoading) {
     return <Loading fullScreen text="Loading device management..." />;
   }
 
@@ -199,8 +218,15 @@ const DeviceAdministrationPage: React.FC = () => {
   ------------------------------------------------------------ */
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-semibold tracking-tight text-gray-800 mb-6">
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex justify-between mb-4">
+          <span className="text-red-600">{error}</span>
+          <button onClick={() => window.location.reload()} className="text-red-600 underline text-sm">Retry</button>
+        </div>
+      )}
+      <h1 className="text-2xl font-semibold tracking-tight text-gray-800 mb-6 flex items-center">
         Device Management
+        {refreshing && <div className="ml-4 animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full" />}
       </h1>
 
       <div className="flex justify-between mb-6">

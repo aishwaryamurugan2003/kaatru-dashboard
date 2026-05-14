@@ -498,13 +498,29 @@ export const Endpoint = {
   FETCH_DATA_ANALYSIS: "/spatio-temporal/raw",
   KEYCLOAK_USERS: "https://caas.kaatru.org/keycloak/users",
   GROUP_ALL: "https://bw04.kaatru.org/group/all",
-  GROUP_DEVICES: "https://bw04.kaatru.org/group",
   ACCESS_MANAGEMENT: "https://caas.kaatru.org/admin/access-management",
   ACCESS_MANAGEMENT_SYNC:
     "https://caas.kaatru.org/admin/access-management/sync",
   DATA_DOWNLOAD: "https://bw02.kaatru.org/job/data/download",
 
   SENSOR_HISTORY: "https://bw06.kaatru.org/stale/filter",
+
+  // ✅ NEW ENDPOINTS (bw04.kaatru.org)
+  BW04_BASE: "https://bw04.kaatru.org",
+  DEVICE_REG: "https://bw04.kaatru.org/register",
+  DEVICE_INFO: "https://bw04.kaatru.org/device",
+  GROUP: "https://bw04.kaatru.org/group",
+  GROUP_DEVICE: "https://bw04.kaatru.org/group/device",
+  GROUP_DEVICES: "https://bw04.kaatru.org/group",
+  SENSOR_GROUP_ALL: "https://bw04.kaatru.org/sensor/group/all",
+  SENSOR_GROUP: "https://bw04.kaatru.org/sensor/group",
+  SENSOR_BRAND_ALL: "https://bw04.kaatru.org/sensor/brand/all",
+  SENSOR_BRAND: "https://bw04.kaatru.org/sensor/brand",
+  // AFTER
+  INFRA_SERVER: "https://bw04.kaatru.org/server",
+  INFRA_SERVER_ALL: "https://bw04.kaatru.org/server",
+  INFRA_WIFI: "https://bw04.kaatru.org/wifi",
+  INFRA_WIFI_ALL: "https://bw04.kaatru.org/wifi/all",
 
   // ✅ OTA ENDPOINTS
   OTA_UPLOAD_FIRMWARE: "/user/upload",
@@ -547,8 +563,9 @@ abstract class ApiService {
 
   abstract get(endpoint: string, payload?: Record<string, any>): Promise<any>;
   abstract post(endpoint: string, payload: any): Promise<any>;
-  abstract put(endpoint: string, payload: any): Promise<any>;
+  abstract put(endpoint: string, payload: any, params?: any): Promise<any>;
   abstract patch(endpoint: string, payload: any): Promise<any>;
+  abstract delete(endpoint: string, payload?: any): Promise<any>;
   abstract getRamanAnalysis(
     endpoint: string,
     payload?: Record<string, any>,
@@ -641,14 +658,19 @@ class Production extends ApiService {
     return axios.post(url, payload, { headers: this.#getHeaders() });
   }
 
-  async put(endpoint: string, payload: any) {
+  async put(endpoint: string, payload: any, params?: any) {
     const url = this.#buildUrl(endpoint);
-    return axios.put(url, payload, { headers: this.#getHeaders() });
+    return axios.put(url, payload, { params, headers: this.#getHeaders() });
   }
 
   async patch(endpoint: string, payload: any) {
     const url = this.#buildUrl(endpoint);
     return axios.patch(url, payload, { headers: this.#getHeaders() });
+  }
+
+  async delete(endpoint: string, payload?: any) {
+    const url = this.#buildUrl(endpoint);
+    return axios.delete(url, { params: payload, headers: this.#getHeaders() });
   }
 
   async getRamanAnalysis(endpoint: string, payload?: any) {
@@ -713,7 +735,7 @@ class Production extends ApiService {
   }
 
   async fetchDevices(): Promise<any[]> {
-    const res = await axios.get(Endpoint.GROUP_DEVICES, {
+    const res = await axios.get(Endpoint.GROUP_DEVICE, {
       headers: this.#getHeaders(),
     });
     return res.data || [];
@@ -812,6 +834,7 @@ class Mock extends ApiService {
   async post() { return {}; }
   async put() { return {}; }
   async patch() { return {}; }
+  async delete() { return {}; }
   async uploadFirmware() { return {}; }
   async setRunningVersion() { return {}; }
   async getRunningVersion() { return { running_version: "1.0.0" }; }
@@ -880,9 +903,20 @@ export async function fetchSensorData({
   });
 
   const queryString = `device_id=${deviceIds.join(",")}&${baseParams.toString()}`;
-  const res = await fetch(`${SENSOR_API_BASE}/data?${queryString}`);
-  if (!res.ok) return { data: [] };
-  return res.json();
+  const url = `${SENSOR_API_BASE}/data?${queryString}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => "No error body");
+      console.error(`🔴 API Error ${res.status} [${url}]:`, errorText);
+      throw new Error(`Failed to fetch sensor data: ${res.status}`);
+    }
+    return res.json();
+  } catch (err: any) {
+    console.error(`🔴 Fetch Exception [${url}]:`, err);
+    throw err;
+  }
 }
 
 export async function fetchFields() {
@@ -1042,7 +1076,14 @@ export async function apiFetchDashboard(
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Failed to fetch dashboard: ${res.status}`);
   const json = await res.json();
-  return json.data ?? null;
+
+  // Route returns: DashboardResponse[] (a plain list, sorted DESC by created_at)
+  if (Array.isArray(json) && json.length > 0) return json[0];
+
+  // Fallback: some versions wrap in { data: ... }
+  if (json?.data) return Array.isArray(json.data) ? json.data[0] ?? null : json.data;
+
+  return null;
 }
 
 /**
