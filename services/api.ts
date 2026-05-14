@@ -904,13 +904,13 @@ export async function fetchSensorData({
 
   const queryString = `device_id=${deviceIds.join(",")}&${baseParams.toString()}`;
   const url = `${SENSOR_API_BASE}/data?${queryString}`;
-  
+
   try {
     const res = await fetch(url);
     if (!res.ok) {
-        const errorText = await res.text().catch(() => "No error body");
-        console.error(`🔴 API Error ${res.status} [${url}]:`, errorText);
-        throw new Error(`Failed to fetch sensor data: ${res.status}`);
+      const errorText = await res.text().catch(() => "No error body");
+      console.error(`🔴 API Error ${res.status} [${url}]:`, errorText);
+      throw new Error(`Failed to fetch sensor data: ${res.status}`);
     }
     return res.json();
   } catch (err: any) {
@@ -1076,7 +1076,14 @@ export async function apiFetchDashboard(
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Failed to fetch dashboard: ${res.status}`);
   const json = await res.json();
-  return json.data ?? null;
+
+  // Route returns: DashboardResponse[] (a plain list, sorted DESC by created_at)
+  if (Array.isArray(json) && json.length > 0) return json[0];
+
+  // Fallback: some versions wrap in { data: ... }
+  if (json?.data) return Array.isArray(json.data) ? json.data[0] ?? null : json.data;
+
+  return null;
 }
 
 /**

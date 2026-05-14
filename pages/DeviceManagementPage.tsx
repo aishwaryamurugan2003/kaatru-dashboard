@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import {
   Table, Button, Modal, Form, Input, Select,
-  Drawer, Badge, Space, Tooltip, message,
+  Drawer, Badge, Space, Tooltip, message, Tag, Empty,
 } from "antd";
 import {
-  EditOutlined, DeleteOutlined, PlusOutlined,
+  EditOutlined, DeleteOutlined, PlusOutlined, SearchOutlined,
 } from "@ant-design/icons";
 import { apiService, Endpoint } from "../services/api";
 import { getCache, setCache } from "../services/cache";
@@ -13,23 +13,33 @@ import Loading from "../components/Loading";
 const { Option } = Select;
 
 const DeviceManagementPage: React.FC = () => {
-  const [devices, setDevices] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [sensorGroups, setSensorGroups] = useState<any[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isDetailVisible, setIsDetailVisible] = useState(false);
+
+  // Group detail drawer
+  const [isGroupDetailVisible, setIsGroupDetailVisible] = useState(false);
+  const [currentGroup, setCurrentGroup] = useState<any>(null);
+  const [groupDetailLoading, setGroupDetailLoading] = useState(false);
+
+  // Device detail drawer
+  const [isDeviceDetailVisible, setIsDeviceDetailVisible] = useState(false);
   const [currentDevice, setCurrentDevice] = useState<any>(null);
+  const [deviceDetailLoading, setDeviceDetailLoading] = useState(false);
+
+  // Register / Edit modal
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingDevice, setEditingDevice] = useState<any>(null);
   const [form] = Form.useForm();
 
-  // There is no "all devices" endpoint — we show groups list as the main table
-  // and let users look up individual devices by ID
-  const fetchGroups = async (force = false) => {
-    const cacheKey = 'groups';
+  // Device ID lookup input (controlled)
+  const [lookupId, setLookupId] = useState("");
 
+  // ── Fetch groups ─────────────────────────────────────────
+  const fetchGroups = async (force = false) => {
+    const cacheKey = "groups";
     if (!force) {
       const cached = getCache<any[]>(cacheKey);
       if (cached && cached.length > 0) {
@@ -38,7 +48,6 @@ const DeviceManagementPage: React.FC = () => {
         return;
       }
     }
-
     try {
       setInitialLoading(groups.length === 0);
       setRefreshing(groups.length > 0);
@@ -47,7 +56,7 @@ const DeviceManagementPage: React.FC = () => {
       setCache(cacheKey, result);
       setGroups(result);
       setError(null);
-    } catch (err) {
+    } catch {
       message.error("Failed to fetch groups");
       setError("Failed to load data. Please try again.");
     } finally {
@@ -56,9 +65,9 @@ const DeviceManagementPage: React.FC = () => {
     }
   };
 
+  // ── Fetch sensor groups ──────────────────────────────────
   const fetchSensorGroups = async (force = false) => {
-    const cacheKey = 'sensor_groups';
-    
+    const cacheKey = "sensor_groups";
     if (!force) {
       const cached = getCache<any[]>(cacheKey);
       if (cached && cached.length > 0) {
@@ -66,14 +75,13 @@ const DeviceManagementPage: React.FC = () => {
         return;
       }
     }
-
     try {
       const res = await apiService.get(Endpoint.SENSOR_GROUP_ALL);
       const result = Array.isArray(res?.data) ? res.data : [];
       setCache(cacheKey, result);
       setSensorGroups(result);
-    } catch (error) {
-      console.error("Failed to fetch sensor groups", error);
+    } catch {
+      console.error("Failed to fetch sensor groups");
     }
   };
 
@@ -82,6 +90,53 @@ const DeviceManagementPage: React.FC = () => {
     fetchSensorGroups();
   }, []);
 
+  // ── Show group detail (/group?id=...) ────────────────────
+  // Response shape: { group: [{...meta}], devices: ["MG1", "SG77", ...] }
+  const showGroupDetail = async (groupId: string) => {
+    setGroupDetailLoading(true);
+    setIsGroupDetailVisible(true);
+    setCurrentGroup(null);
+    try {
+      const res = await apiService.get(Endpoint.GROUP, { id: groupId });
+      const data = res?.data;
+      const groupMeta = Array.isArray(data?.group) ? data.group[0] : data?.group || {};
+      const devices: string[] = Array.isArray(data?.devices) ? data.devices : [];
+      setCurrentGroup({ meta: groupMeta, devices });
+    } catch {
+      message.error("Failed to fetch group details");
+      setIsGroupDetailVisible(false);
+    } finally {
+      setGroupDetailLoading(false);
+    }
+  };
+
+  // ── Show device detail (/device?id=...) ──────────────────
+  // Response shape: { device: [{...meta}], sensors: [...] }
+  // device may be [] if no metadata row exists yet
+  const showDeviceDetail = async (deviceId: string) => {
+    if (!deviceId?.trim()) {
+      message.warning("Enter a device ID");
+      return;
+    }
+    setDeviceDetailLoading(true);
+    setIsDeviceDetailVisible(true);
+    setCurrentDevice(null);
+    try {
+      const res = await apiService.get(Endpoint.DEVICE_INFO, { id: deviceId.trim() });
+      const data = res?.data;
+      const deviceArr = Array.isArray(data?.device) ? data.device : [];
+      const meta = deviceArr[0] || {};
+      const sensors = Array.isArray(data?.sensors) ? data.sensors : [];
+      setCurrentDevice({ id: deviceId.trim(), ...meta, sensors });
+    } catch {
+      message.error("Failed to fetch device details");
+      setIsDeviceDetailVisible(false);
+    } finally {
+      setDeviceDetailLoading(false);
+    }
+  };
+
+  // ── Register / Edit ──────────────────────────────────────
   const handleRegister = () => {
     setEditingDevice(null);
     form.resetFields();
@@ -125,34 +180,20 @@ const DeviceManagementPage: React.FC = () => {
         message.success("Device registered successfully");
       }
       setIsModalVisible(false);
-      fetchGroups();
+      fetchGroups(true);
     } catch (error: any) {
       const detail = error?.response?.data?.detail;
       message.error(
         typeof detail === "string"
           ? detail
           : editingDevice
-          ? "Failed to update device"
-          : "Failed to register device"
+            ? "Failed to update device"
+            : "Failed to register device"
       );
     }
   };
 
-  const showDetail = async (deviceId: string) => {
-    try {
-      const res = await apiService.get(Endpoint.DEVICE_INFO, { id: deviceId });
-      // backend returns { device: [...], sensors: [...] }
-      const data = res?.data;
-      const deviceArr = Array.isArray(data?.device) ? data.device : [];
-      const meta = deviceArr[0] || {};
-      const sensors = Array.isArray(data?.sensors) ? data.sensors : [];
-      setCurrentDevice({ ...meta, sensors });
-      setIsDetailVisible(true);
-    } catch (error) {
-      message.error("Failed to fetch device details");
-    }
-  };
-
+  // ── Avatar color helper ──────────────────────────────────
   const getAvatarColor = (text: string) => {
     let hash = 0;
     for (let i = 0; i < (text || "").length; i++)
@@ -168,9 +209,21 @@ const DeviceManagementPage: React.FC = () => {
     return colors[Math.abs(hash) % colors.length];
   };
 
-  // Groups table — clicking a group's name shows its devices
+  // ── Groups table columns ─────────────────────────────────
   const groupColumns = [
-    { title: "Group ID", dataIndex: "id", key: "id" },
+    {
+      title: "Group ID",
+      dataIndex: "id",
+      key: "id",
+      render: (id: string) => (
+        <button
+          className="text-blue-600 font-mono text-sm hover:underline"
+          onClick={() => showGroupDetail(id)}
+        >
+          {id}
+        </button>
+      ),
+    },
     {
       title: "Name",
       dataIndex: "name",
@@ -181,8 +234,11 @@ const DeviceManagementPage: React.FC = () => {
       title: "Status",
       dataIndex: "status",
       key: "status",
-      render: (s: boolean) => (
-        <Badge status={s ? "success" : "error"} text={s ? "Active" : "Inactive"} />
+      render: (s: any) => (
+        <Badge
+          status={s === 1 || s === true ? "success" : "error"}
+          text={s === 1 || s === true ? "Active" : "Inactive"}
+        />
       ),
     },
     { title: "Server", dataIndex: "server", key: "server" },
@@ -193,16 +249,27 @@ const DeviceManagementPage: React.FC = () => {
 
   return (
     <div className="p-6">
+
+      {/* ── Error banner ────────────────────────────────────── */}
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex justify-between mb-4">
           <span className="text-red-600">{error}</span>
-          <button onClick={() => window.location.reload()} className="text-red-600 underline text-sm">Retry</button>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-red-600 underline text-sm"
+          >
+            Retry
+          </button>
         </div>
       )}
+
+      {/* ── Page header ─────────────────────────────────────── */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center">
           Device Management
-          {refreshing && <div className="ml-4 animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full" />}
+          {refreshing && (
+            <div className="ml-4 animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full" />
+          )}
         </h1>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleRegister}>
           Register Device
@@ -214,19 +281,17 @@ const DeviceManagementPage: React.FC = () => {
         <p className="text-sm font-medium text-gray-600 mb-2">Look up a device by ID</p>
         <div className="flex gap-2">
           <Input
-            placeholder="Enter device ID (e.g. SN001)"
-            id="device-id-input"
+            placeholder="Enter device ID (e.g. SG77)"
+            value={lookupId}
+            onChange={(e) => setLookupId(e.target.value)}
+            onPressEnter={() => showDeviceDetail(lookupId)}
             style={{ maxWidth: 300 }}
+            prefix={<SearchOutlined className="text-gray-400" />}
           />
           <Button
             type="primary"
-            onClick={() => {
-              const val = (
-                document.getElementById("device-id-input") as HTMLInputElement
-              )?.value?.trim();
-              if (val) showDetail(val);
-              else message.warning("Enter a device ID");
-            }}
+            loading={deviceDetailLoading}
+            onClick={() => showDeviceDetail(lookupId)}
           >
             Fetch Device
           </Button>
@@ -237,7 +302,10 @@ const DeviceManagementPage: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-4 pt-4 pb-2">
           <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">
-            Groups Overview
+            Groups Overview{" "}
+            <span className="text-gray-300 font-normal ml-1">
+              · Click a Group ID to see its devices
+            </span>
           </p>
         </div>
         <Table
@@ -248,7 +316,7 @@ const DeviceManagementPage: React.FC = () => {
         />
       </div>
 
-      {/* ── Register / Edit Device Modal ────────────────────── */}
+      {/* ── Register / Edit Device Modal ─────────────────────── */}
       <Modal
         title={editingDevice ? "Edit Device" : "Register Device"}
         open={isModalVisible}
@@ -347,27 +415,99 @@ const DeviceManagementPage: React.FC = () => {
         </Form>
       </Modal>
 
+      {/* ── Group Detail Drawer ─────────────────────────────── */}
+      <Drawer
+        title={
+          currentGroup
+            ? `Group: ${currentGroup.meta?.name || currentGroup.meta?.id || "..."}`
+            : "Group Details"
+        }
+        placement="right"
+        size="large"
+        onClose={() => setIsGroupDetailVisible(false)}
+        open={isGroupDetailVisible}
+        loading={groupDetailLoading}
+      >
+        {currentGroup && (
+          <div className="space-y-6">
+            {/* Group meta grid */}
+            <div className="grid grid-cols-2 gap-y-4 border-b pb-5">
+              {(
+                [
+                  ["ID", currentGroup.meta?.id],
+                  ["Server", currentGroup.meta?.server],
+                  ["MQTT Topic", currentGroup.meta?.mqtt_topic],
+                  ["Primary DB", currentGroup.meta?.primarydb],
+                  ["Secondary DB", currentGroup.meta?.secondarydb],
+                  [
+                    "Status",
+                    currentGroup.meta?.status === 1 || currentGroup.meta?.status === true
+                      ? "Active"
+                      : "Inactive",
+                  ],
+                ] as [string, string][]
+              ).map(([label, val]) => (
+                <div key={label}>
+                  <p className="text-xs text-gray-400">{label}</p>
+                  <p className="text-sm font-medium">{val || "—"}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Device ID tags */}
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                Devices ({currentGroup.devices.length})
+              </p>
+              {currentGroup.devices.length === 0 ? (
+                <Empty description="No devices in this group" />
+              ) : (
+                <div className="flex flex-wrap gap-2 max-h-96 overflow-y-auto pr-1">
+                  {currentGroup.devices.map((deviceId: string) => (
+                    <Tag
+                      key={deviceId}
+                      className="cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-colors"
+                      onClick={() => {
+                        setIsGroupDetailVisible(false);
+                        setLookupId(deviceId);
+                        showDeviceDetail(deviceId);
+                      }}
+                    >
+                      {deviceId}
+                    </Tag>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-gray-400 mt-3 italic">
+                Click a device ID to view its details
+              </p>
+            </div>
+          </div>
+        )}
+      </Drawer>
+
       {/* ── Device Detail Drawer ────────────────────────────── */}
       <Drawer
         title="Device Details"
         placement="right"
         size="large"
-        onClose={() => setIsDetailVisible(false)}
-        open={isDetailVisible}
+        onClose={() => setIsDeviceDetailVisible(false)}
+        open={isDeviceDetailVisible}
+        loading={deviceDetailLoading}
         extra={
-          currentDevice && (
+          currentDevice?.device_name ? (
             <Button
               type="primary"
               ghost
               icon={<EditOutlined />}
               onClick={() => {
-                setIsDetailVisible(false);
+                setIsDeviceDetailVisible(false);
                 handleEdit(currentDevice);
               }}
             >
               Edit
             </Button>
-          )
+          ) : null
         }
       >
         {currentDevice && (
@@ -376,14 +516,23 @@ const DeviceManagementPage: React.FC = () => {
             <div className="flex items-center gap-4 border-b pb-6">
               <div
                 className={`w-16 h-16 rounded-full flex items-center justify-center font-bold text-2xl ${getAvatarColor(
-                  currentDevice.device_name
+                  currentDevice.device_name || currentDevice.id
                 )}`}
               >
-                {currentDevice.device_name?.charAt(0)?.toUpperCase()}
+                {(currentDevice.device_name || currentDevice.id)?.charAt(0)?.toUpperCase()}
               </div>
               <div>
-                <h2 className="text-xl font-bold">{currentDevice.device_name}</h2>
-                <p className="text-gray-500 text-sm">{currentDevice.device}</p>
+                <h2 className="text-xl font-bold">
+                  {currentDevice.device_name || currentDevice.id}
+                </h2>
+                <p className="text-gray-500 text-sm font-mono">
+                  {currentDevice.device || currentDevice.id}
+                </p>
+                {!currentDevice.device_name && (
+                  <p className="text-xs text-amber-500 mt-1">
+                    No metadata found — device may not be registered yet
+                  </p>
+                )}
               </div>
             </div>
 
@@ -409,12 +558,18 @@ const DeviceManagementPage: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">WiFi Password</p>
-                  <p className="text-sm font-medium text-gray-400">••••••••</p>
+                  <p className="text-sm font-medium text-gray-400">
+                    {currentDevice.password ? "••••••••" : "—"}
+                  </p>
                 </div>
                 <div className="col-span-2">
                   <p className="text-xs text-gray-500">Location</p>
                   <p className="text-sm font-medium">
-                    {currentDevice.lat ?? "—"}, {currentDevice.longitude ?? "—"}
+                    {currentDevice.lat != null && currentDevice.longitude != null
+                      ? `${currentDevice.lat}, ${currentDevice.longitude}`
+                      : currentDevice.lat != null
+                        ? `${currentDevice.lat}, —`
+                        : "—"}
                   </p>
                 </div>
               </div>
@@ -450,6 +605,7 @@ const DeviceManagementPage: React.FC = () => {
           </div>
         )}
       </Drawer>
+
     </div>
   );
 };
