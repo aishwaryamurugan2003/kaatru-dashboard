@@ -4,14 +4,16 @@ import { getCache, setCache } from "../services/cache";
 import { useRealtimeDevices } from "../hooks/useRealtimeDevices";
 import RealtimeMapAll from "@/components/RealtimeMapAll";
 import Loading from "../components/Loading";
-import SensorHistoryChart from "@/components/SensorHistoryChart";
+import { RenderChart } from "@/components/RenderChart";
 import ReactCardFlip from "react-card-flip";
 import DynamicVisualization from "@/components/DynamicVisualization";
 import Select from "react-select";
+
 interface Option {
   label: string;
   value: string;
 }
+
 function calculateAverages(devices: Record<string, any>) {
   const list = Object.values(devices);
 
@@ -23,13 +25,13 @@ function calculateAverages(devices: Record<string, any>) {
         if (isPM) {
           return v >= 0 && v <= 2000;
         }
-
         return true;
       });
 
     if (!vals.length) return "--";
     return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
   };
+
   return {
     pm25: avg("sPM2", true),
     pm10: avg("sPM10", true),
@@ -37,6 +39,7 @@ function calculateAverages(devices: Record<string, any>) {
     humidity: avg("rh"),
   };
 }
+
 const RealtimeDashboardPage: React.FC = () => {
   const [groups, setGroups] = useState<any[]>([]);
   const [selectedGroup, setSelectedGroup] = useState("");
@@ -49,33 +52,18 @@ const RealtimeDashboardPage: React.FC = () => {
   const [showVisualization, setShowVisualization] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
 
-
-  // 🔥 NEW: index-based rotation
   const [activeIndex, setActiveIndex] = useState(0);
-
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [autoRotate, setAutoRotate] = useState(true);
   const [flipped, setFlipped] = useState(false);
+  const [chartTimeFilter, setChartTimeFilter] = useState("3H");
 
   const devices = useRealtimeDevices(selectedGroup, selectedDevices);
-
-  // const filteredDevices = useMemo(() => {
-  //   const result: Record<string, any> = {};
-
-  //   for (const id of selectedDevices) {
-  //     if (devices[id]) {
-  //       result[id] = devices[id];
-  //     }
-  //   }
-
-  //   return result;
-  // }, [devices, selectedDevices.join(",")]);
 
   const filteredDevices = useMemo(() => {
     if (!selectedDevices.length) return devices;
 
     const result: Record<string, any> = {};
-
     Object.entries(devices).forEach(([id, data]) => {
       if (selectedDevices.includes(id)) {
         result[id] = data;
@@ -85,18 +73,6 @@ const RealtimeDashboardPage: React.FC = () => {
     return result;
   }, [devices, selectedDevices]);
 
-  // const deviceStats = useMemo(() => {
-  //   const total = selectedDevices.length;
-
-  //   const active = selectedDevices.filter((id) => devices[id]).length;
-  //   const inactive = total - active;
-
-  //   return {
-  //     total,
-  //     active,
-  //     inactive,
-  //   };
-  // }, [devices, selectedDevices]);
   const ACTIVE_THRESHOLD = 60 * 1000;
 
   const deviceStats = useMemo(() => {
@@ -104,35 +80,24 @@ const RealtimeDashboardPage: React.FC = () => {
     const now = Date.now();
 
     let active = 0;
-
     selectedDevices.forEach((id) => {
       const d = devices[id];
-
       if (!d) return;
-
       const lastSeen = Number(d.srvtime || 0);
-
       if (now - lastSeen <= ACTIVE_THRESHOLD) {
         active++;
       }
     });
 
     const inactive = total - active;
-
-    return {
-      total,
-      active,
-      inactive,
-    };
+    return { total, active, inactive };
   }, [devices, selectedDevices]);
 
   const deviceMetaMap = useMemo(() => {
     const map: Record<string, any> = {};
-
     groupDevices.forEach((d: any) => {
       map[d.id] = d;
     });
-
     return map;
   }, [groupDevices]);
 
@@ -141,19 +106,15 @@ const RealtimeDashboardPage: React.FC = () => {
 
     let mobileTotal = 0;
     let mobileActive = 0;
-
     let stationaryTotal = 0;
     let stationaryActive = 0;
 
     selectedDevices.forEach((id) => {
       const d = devices[id];
-
       const type =
         deviceMetaMap[id]?.type ||
         (id.toUpperCase().startsWith("M") ? "mobile" : "stationary");
-
-      const isActive =
-        d && now - Number(d.srvtime || 0) <= ACTIVE_THRESHOLD;
+      const isActive = d && now - Number(d.srvtime || 0) <= ACTIVE_THRESHOLD;
 
       if (type === "mobile") {
         mobileTotal++;
@@ -165,14 +126,8 @@ const RealtimeDashboardPage: React.FC = () => {
     });
 
     return {
-      mobile: {
-        total: mobileTotal,
-        active: mobileActive,
-      },
-      stationary: {
-        total: stationaryTotal,
-        active: stationaryActive,
-      },
+      mobile: { total: mobileTotal, active: mobileActive },
+      stationary: { total: stationaryTotal, active: stationaryActive },
     };
   }, [devices, selectedDevices, deviceMetaMap]);
 
@@ -180,8 +135,6 @@ const RealtimeDashboardPage: React.FC = () => {
     selectedGroup &&
     selectedDevices.length > 0 &&
     Object.keys(devices).length === 0;
-
-
 
   const isRealtimeLoading =
     selectedGroup &&
@@ -193,10 +146,8 @@ const RealtimeDashboardPage: React.FC = () => {
     [filteredDevices]
   );
 
-  // 🔥 derive active device from index
   const activeDeviceId = activeDeviceIds[activeIndex] ?? null;
 
-  // reset on group change
   useEffect(() => {
     setSelectedDeviceId(null);
     setFlipped(false);
@@ -204,21 +155,16 @@ const RealtimeDashboardPage: React.FC = () => {
     setActiveIndex(0);
   }, [selectedGroup]);
 
-  // 🔥 stable autoplay rotation
   useEffect(() => {
     if (!autoRotate || activeDeviceIds.length === 0) return;
 
     const interval = setInterval(() => {
-      setActiveIndex((prev) =>
-        (prev + 1) % activeDeviceIds.length
-      );
+      setActiveIndex((prev) => (prev + 1) % activeDeviceIds.length);
     }, 7000);
-
 
     return () => clearInterval(interval);
   }, [autoRotate, activeDeviceIds.length]);
 
-  // reset index when device list changes
   useEffect(() => {
     setActiveIndex(0);
   }, [activeDeviceIds.length]);
@@ -227,23 +173,18 @@ const RealtimeDashboardPage: React.FC = () => {
     if (selectedDeviceId && devices[selectedDeviceId]) {
       return selectedDeviceId;
     }
-
     if (activeDeviceId && devices[activeDeviceId]) {
       return activeDeviceId;
     }
-
     return activeDeviceIds[0] ?? null;
   }, [selectedDeviceId, activeDeviceId, activeDeviceIds, devices]);
 
-  const focusedDevice = focusedDeviceId
-    ? filteredDevices[focusedDeviceId]
-    : null;
+  const focusedDevice = focusedDeviceId ? filteredDevices[focusedDeviceId] : null;
 
   const aggregate = useMemo(
     () => calculateAverages(filteredDevices),
     [filteredDevices]
   );
-
 
   const chartData = useMemo(() => {
     return Object.entries(filteredDevices).map(([id, d]: any) => ({
@@ -256,11 +197,10 @@ const RealtimeDashboardPage: React.FC = () => {
     }));
   }, [filteredDevices]);
 
-
   // fetch groups
   useEffect(() => {
     const fetchGroups = async (force = false) => {
-      const cacheKey = 'groups';
+      const cacheKey = "groups";
 
       if (!force) {
         const cached = getCache<any[]>(cacheKey);
@@ -275,7 +215,9 @@ const RealtimeDashboardPage: React.FC = () => {
         setInitialLoading(groups.length === 0);
         setRefreshing(groups.length > 0);
         const res: any = await apiService.get(Endpoint.GROUP_ALL);
-        const result = Array.isArray(res?.data) ? res.data : (res?.data?.group || []);
+        const result = Array.isArray(res?.data)
+          ? res.data
+          : res?.data?.group || [];
         setCache(cacheKey, result);
         setGroups(result);
         setError(null);
@@ -315,7 +257,7 @@ const RealtimeDashboardPage: React.FC = () => {
         const cached = getCache<any[]>(cacheKey);
         if (cached && cached.length > 0) {
           setGroupDevices(cached);
-          setSelectedDevices(cached.map(d => d.id));
+          setSelectedDevices(cached.map((d) => d.id));
           setSelectedDeviceId(null);
           setAutoRotate(true);
           setFlipped(false);
@@ -328,7 +270,9 @@ const RealtimeDashboardPage: React.FC = () => {
       try {
         setInitialLoading(groupDevices.length === 0);
         setRefreshing(groupDevices.length > 0);
-        const res: any = await apiService.get(Endpoint.GROUP_DEVICES, { id: selectedGroup });
+        const res: any = await apiService.get(Endpoint.GROUP_DEVICES, {
+          id: selectedGroup,
+        });
 
         const devs = Array.isArray(res?.data?.devices) ? res.data.devices : [];
         const deviceDetails = devs.map((id: string) => ({
@@ -338,7 +282,7 @@ const RealtimeDashboardPage: React.FC = () => {
 
         setCache(cacheKey, deviceDetails);
         setGroupDevices(deviceDetails);
-        setSelectedDevices(deviceDetails.map(d => d.id));
+        setSelectedDevices(deviceDetails.map((d: any) => d.id));
         setSelectedDeviceId(null);
         setAutoRotate(true);
         setFlipped(false);
@@ -357,13 +301,10 @@ const RealtimeDashboardPage: React.FC = () => {
 
   function toggleDevice(id: string) {
     setSelectedDevices((prev) =>
-      prev.includes(id)
-        ? prev.filter((d) => d !== id)
-        : [...prev, id]
+      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
     );
   }
 
-  // loading states
   if (initialLoading) {
     return <Loading fullScreen text="Loading realtime dashboard..." />;
   }
@@ -380,36 +321,33 @@ const RealtimeDashboardPage: React.FC = () => {
     );
   }
 
-  // UI remains unchanged below
-
   return (
     <div className="p-6 space-y-4 bg-gray-50 dark:bg-gray-900">
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex justify-between">
           <span className="text-red-600">{error}</span>
-          <button onClick={() => window.location.reload()} className="text-red-600 underline text-sm">Retry</button>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-red-600 underline text-sm"
+          >
+            Retry
+          </button>
         </div>
       )}
-      
+
       {/* TOP FILTER BAR */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 bg-white dark:bg-gray-800 p-3 rounded-xl shadow relative">
-        {refreshing && <div className="absolute right-4 top-4 animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full" />}
+        {refreshing && (
+          <div className="absolute right-4 top-4 animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full" />
+        )}
         <Select
-          options={groups.map((g: any) => ({
-            label: g.name,
-            value: g.id,
-          }))}
+          options={groups.map((g: any) => ({ label: g.name, value: g.id }))}
           value={
             groups
-              .map((g: any) => ({
-                label: g.name,
-                value: g.id,
-              }))
+              .map((g: any) => ({ label: g.name, value: g.id }))
               .find((g) => g.value === selectedGroup) || null
           }
-          onChange={(opt) =>
-            setSelectedGroup((opt as Option)?.value || "")
-          }
+          onChange={(opt) => setSelectedGroup((opt as Option)?.value || "")}
           placeholder="Select Group"
           className="w-full md:w-64"
         />
@@ -417,21 +355,13 @@ const RealtimeDashboardPage: React.FC = () => {
           isMulti
           closeMenuOnSelect={false}
           hideSelectedOptions={false}
-          options={groupDevices.map((d: any) => ({
-            label: d.id,
-            value: d.id,
-          }))}
-          value={selectedDevices.map((id) => ({
-            label: id,
-            value: id,
-          }))}
+          options={groupDevices.map((d: any) => ({ label: d.id, value: d.id }))}
+          value={selectedDevices.map((id) => ({ label: id, value: id }))}
           onChange={(opts) =>
-            setSelectedDevices(
-              (opts as Option[]).map((o) => o.value)
-            )
+            setSelectedDevices((opts as Option[]).map((o) => o.value))
           }
           placeholder="Select Devices"
-          className="w-full md:w-64" // ✅ same width as Select Group
+          className="w-full md:w-64"
           styles={{
             control: (base) => ({
               ...base,
@@ -440,7 +370,6 @@ const RealtimeDashboardPage: React.FC = () => {
               alignItems: "center",
               boxShadow: "none",
             }),
-
             valueContainer: (base) => ({
               ...base,
               padding: "2px 8px",
@@ -449,14 +378,12 @@ const RealtimeDashboardPage: React.FC = () => {
               overflowX: "auto",
               scrollbarWidth: "none",
             }),
-
             multiValue: (base) => ({
               ...base,
               backgroundColor: "#dbeafe",
               borderRadius: "4px",
               flexShrink: 0,
             }),
-
             multiValueLabel: (base) => ({
               ...base,
               color: "#2563eb",
@@ -464,7 +391,6 @@ const RealtimeDashboardPage: React.FC = () => {
               fontSize: "12px",
               padding: "2px",
             }),
-
             multiValueRemove: (base) => ({
               ...base,
               color: "#2563eb",
@@ -473,17 +399,9 @@ const RealtimeDashboardPage: React.FC = () => {
                 color: "#1d4ed8",
               },
             }),
-
-            indicatorSeparator: () => ({
-              display: "none",
-            }),
-
-            menu: (base) => ({
-              ...base,
-              zIndex: 9999,
-            }),
+            indicatorSeparator: () => ({ display: "none" }),
+            menu: (base) => ({ ...base, zIndex: 9999 }),
           }}
-
         />
         <div className="relative flex justify-end w-full md:w-auto">
           <button
@@ -511,32 +429,15 @@ const RealtimeDashboardPage: React.FC = () => {
 
       {/* STATUS CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatusCard
-          label="Total Devices"
-          value={deviceStats.total}
-          loading={isStatsLoading}
-        />
-        <StatusCard
-          label="Active Devices"
-          value={deviceStats.active}
-          loading={isStatsLoading}
-          color="green"
-        />
-        <StatusCard
-          label="Inactive Devices"
-          value={deviceStats.inactive}
-          loading={isStatsLoading}
-          color="red"
-        />
+        <StatusCard label="Total Devices" value={deviceStats.total} loading={isStatsLoading} />
+        <StatusCard label="Active Devices" value={deviceStats.active} loading={isStatsLoading} color="green" />
+        <StatusCard label="Inactive Devices" value={deviceStats.inactive} loading={isStatsLoading} color="red" />
       </div>
 
       {/* DEVICE TYPE CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-        {/* MOBILE */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-5 text-center">
           <div className="text-gray-500 mb-2">Mobile Devices</div>
-
           {isStatsLoading ? (
             <div className="animate-pulse h-8 w-20 bg-gray-300 rounded mx-auto" />
           ) : (
@@ -546,10 +447,8 @@ const RealtimeDashboardPage: React.FC = () => {
           )}
         </div>
 
-        {/* STATIONARY */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-5 text-center">
           <div className="text-gray-500 mb-2">Stationary Devices</div>
-
           {isStatsLoading ? (
             <div className="animate-pulse h-8 w-20 bg-gray-300 rounded mx-auto" />
           ) : (
@@ -558,11 +457,7 @@ const RealtimeDashboardPage: React.FC = () => {
             </div>
           )}
         </div>
-
       </div>
-
-
-
 
       {/* MAIN GRID */}
       <div className="grid grid-cols-1 xl:grid-cols-[3fr_2fr] gap-4">
@@ -591,10 +486,7 @@ const RealtimeDashboardPage: React.FC = () => {
 
               {/* AGGREGATE */}
               <div>
-                <h2 className="text-lg font-semibold mb-3 text-center">
-                  AGGREGATE
-                </h2>
-
+                <h2 className="text-lg font-semibold mb-3 text-center">AGGREGATE</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-white rounded-xl shadow p-6 md:p-8 flex items-center justify-center text-center">
                     <div>
@@ -605,7 +497,6 @@ const RealtimeDashboardPage: React.FC = () => {
                       </div>
                     </div>
                   </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <SensorCard label="Temperature" value={aggregate.temp} unit="°C" />
                     <SensorCard label="Humidity" value={aggregate.humidity} unit="%" />
@@ -620,7 +511,6 @@ const RealtimeDashboardPage: React.FC = () => {
                 <h2 className="text-lg font-semibold text-center mb-3">
                   {focusedDeviceId || "Device"}
                 </h2>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="grid grid-cols-2 gap-4">
                     <SensorCard label="PM 1" value={focusedDevice?.sPM2 ?? "--"} unit="µg/m³" />
@@ -628,7 +518,6 @@ const RealtimeDashboardPage: React.FC = () => {
                     <SensorCard label="Temperature" value={focusedDevice?.temp ?? "--"} unit="°C" />
                     <SensorCard label="Humidity" value={focusedDevice?.rh ?? "--"} unit="%" />
                   </div>
-
                   <div className="bg-white rounded-xl shadow p-8 flex items-center justify-center text-center">
                     <div>
                       <div className="text-gray-500 text-xl">PM 2.5</div>
@@ -644,34 +533,64 @@ const RealtimeDashboardPage: React.FC = () => {
             </div>
 
             {/* ---------------- BACK SIDE (CHART) ---------------- */}
-            <div className="bg-white rounded-xl shadow p-3 h-[420px]">
-              <div className="flex justify-between mb-2">
+            <div className="bg-white rounded-xl shadow p-3 h-[420px] flex flex-col">
+              <div className="flex justify-between items-center mb-2">
                 <h2 className="font-semibold">
                   Device History ({focusedDeviceId})
                 </h2>
-                <button
-                  className="text-blue-600 text-sm"
-                  onClick={() => {
-                    setFlipped(false);
-                    setSelectedDeviceId(null);
-                    setAutoRotate(true);
-                  }}
-                >
-                  Back
-                </button>
+                <div className="flex items-center gap-2">
+                  {/* Time Filter Buttons */}
+                  <div className="flex gap-1">
+                    {["1H", "3H", "6H", "12H", "24H"].map((tf) => (
+                      <button
+                        key={tf}
+                        className={`px-2 py-0.5 text-xs rounded border transition-colors ${chartTimeFilter === tf
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "text-gray-600 border-gray-300 hover:border-blue-400"
+                          }`}
+                        onClick={() => setChartTimeFilter(tf)}
+                      >
+                        {tf}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    className="text-blue-600 text-sm"
+                    onClick={() => {
+                      setFlipped(false);
+                      setSelectedDeviceId(null);
+                      setAutoRotate(true);
+                    }}
+                  >
+                    Back
+                  </button>
+                </div>
               </div>
 
-              <SensorHistoryChart deviceId={focusedDeviceId} />
+              {/* Chart fills remaining height */}
+              <div className="flex-1 min-h-0">
+                {focusedDeviceId && (
+                  <RenderChart
+                    config={{
+                      id: focusedDeviceId,
+                      type: "line",
+                      xKey: "srvtime",
+                      yKey: "sPM2",
+                    }}
+                    devices={[{ label: focusedDeviceId, value: focusedDeviceId }]}
+                    measurement="gurprod"
+                    timeFilter={chartTimeFilter}
+                  />
+                )}
+              </div>
             </div>
 
           </ReactCardFlip>
         </div>
 
-
         {showVisualization && (
           <DynamicVisualization data={chartData} />
         )}
-
 
       </div>
     </div>
@@ -716,15 +635,13 @@ const StatusCard = ({
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-5">
       <div className="text-sm text-gray-500 mb-2">{label}</div>
-
       {loading ? (
         <div className="animate-pulse h-8 w-16 bg-gray-300 rounded" />
       ) : (
-        <div className={`text-3xl font-bold ${colorMap[color]}`}>
-          {value}
-        </div>
+        <div className={`text-3xl font-bold ${colorMap[color]}`}>{value}</div>
       )}
     </div>
   );
 };
+
 export default RealtimeDashboardPage;
