@@ -9,8 +9,6 @@ import SingleDeviceDashboardView from "../components/dashboards/SingleDeviceDash
 import { ArrowLeftOutlined, FolderOpenOutlined } from "@ant-design/icons";
 import Select from "react-select";
 
-// Cache is imported from services/cache.ts
-
 // Values that mean "no real DB configured"
 const INVALID_DB_VALUES = new Set([
   "string", "null", "NULL", "", "admin", "ADMIN",
@@ -29,23 +27,40 @@ function isStationaryDevice(id: string): boolean {
 /**
  * Resolve the InfluxDB measurement name from group info.
  * Falls back to "gurprod" (the most common default in this system).
- * If your group uses "sendata" or another name, it must be set in primarydb.
  */
 function resolveMeasurement(groupInfo: any): string {
   if (!groupInfo) return "gurprod";
 
   const primary = groupInfo.primarydb?.trim();
 
-  // If primarydb is set and is a real value, use it (case-preserved)
   if (primary && !INVALID_DB_VALUES.has(primary) && !INVALID_DB_VALUES.has(primary.toLowerCase())) {
     console.log(`✅ Using primarydb as measurement: "${primary}"`);
     return primary;
   }
 
-  // Fallback
   console.warn(`⚠️ primarydb="${primary}" is invalid — falling back to "gurprod"`);
   return "gurprod";
 }
+
+// ── Time filter options with start value and default interval ─────────────────
+const timeFilterOptions = [
+  { label: "5M", value: "5M", start: "-5m", defaultInterval: "1m" },
+  { label: "15M", value: "15M", start: "-15m", defaultInterval: "5m" },
+  { label: "1H", value: "1H", start: "-1h", defaultInterval: "5m" },
+  { label: "3H", value: "3H", start: "-3h", defaultInterval: "5m" },
+  { label: "5H", value: "5H", start: "-5h", defaultInterval: "10m" },
+  { label: "1D", value: "1D", start: "-1d", defaultInterval: "30m" },
+];
+
+// ── Interval options ──────────────────────────────────────────────────────────
+const intervalOptions = [
+  { label: "1m", value: "1m" },
+  { label: "5m", value: "5m" },
+  { label: "10m", value: "10m" },
+  { label: "15m", value: "15m" },
+  { label: "30m", value: "30m" },
+  { label: "1h", value: "1h" },
+];
 
 const MultiDeviceDashboardPage: React.FC = () => {
   const { groupId, dashboardType } = useParams<{
@@ -74,16 +89,19 @@ const MultiDeviceDashboardPage: React.FC = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedFilter, setSelectedFilter] = useState("3H");
 
-  const timeFilterOptions = [
-    { label: "5M", value: "5M" },
-    { label: "15M", value: "15M" },
-    { label: "1H", value: "1H" },
-    { label: "3H", value: "3H" },
-    { label: "5H", value: "5H" },
-    { label: "1D", value: "1D" },
-  ];
+  // ── Time filter + interval state ──────────────────────────────────────────
+  const [selectedFilter, setSelectedFilter] = useState("3H");
+  const [selectedInterval, setSelectedInterval] = useState("5m");
+
+  // ── Handle time filter change — auto-sync interval ────────────────────────
+  const handleTimeFilterChange = (opt: any) => {
+    const chosen = timeFilterOptions.find((o) => o.value === opt?.value);
+    setSelectedFilter(opt?.value || "3H");
+    if (chosen) {
+      setSelectedInterval(chosen.defaultInterval);
+    }
+  };
 
   useEffect(() => {
     async function loadDevices(force = false) {
@@ -110,7 +128,6 @@ const MultiDeviceDashboardPage: React.FC = () => {
         let allDeviceIds: string[] = [];
         let resolvedMeasurement = "gurprod";
 
-        // Fetch from backend
         const res = await apiService.get(Endpoint.GROUP, { id: groupId });
         const data = res?.data;
 
@@ -120,7 +137,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
           : data?.group ?? null;
 
         resolvedMeasurement = resolveMeasurement(groupInfo);
-        
+
         setCache(cacheKeyDevices, allDeviceIds);
         setCache(cacheKeyMeasure, resolvedMeasurement);
 
@@ -155,6 +172,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
     }
 
     loadDevices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, effectiveDashboardType, isCustomFolder]);
 
   // ── Page title ────────────────────────────────────────────────────────────
@@ -220,6 +238,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
           defaultChartType="line"
           measurement={measurement}
           timeFilter={selectedFilter}
+          interval={selectedInterval}
           isCustomFolder={true}
           folderId={location.state?.folderId as number | undefined}
         />
@@ -234,6 +253,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
             devices={selectedDevices}
             headerNode={headerNode}
             timeFilter={selectedFilter}
+            interval={selectedInterval}
           />
         );
 
@@ -245,6 +265,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
             devices={selectedDevices}
             headerNode={headerNode}
             timeFilter={selectedFilter}
+            interval={selectedInterval}
           />
         );
 
@@ -257,6 +278,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
             defaultChartType="scatter"
             measurement={measurement}
             timeFilter={selectedFilter}
+            interval={selectedInterval}
           />
         );
 
@@ -271,6 +293,7 @@ const MultiDeviceDashboardPage: React.FC = () => {
             defaultChartType="line"
             measurement={measurement}
             timeFilter={selectedFilter}
+            interval={selectedInterval}
           />
         );
     }
@@ -302,17 +325,23 @@ const MultiDeviceDashboardPage: React.FC = () => {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {/* DEVICE SELECTOR + TIME FILTER */}
+            {/* DEVICE SELECTOR + TIME FILTER + INTERVAL */}
             <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow border dark:border-gray-700 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+
+              {/* LEFT: device selector */}
               <div className="flex flex-col md:flex-row items-center gap-4">
                 <span className="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap pl-2 flex items-center">
                   Select Devices
-                  {refreshing && <div className="ml-2 animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />}
+                  {refreshing && (
+                    <div className="ml-2 animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+                  )}
                 </span>
-                {/* Measurement badge — helps debug */}
+
+                {/* Measurement badge */}
                 <span className="text-xs bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full font-mono">
                   {measurement}
                 </span>
+
                 <div className="w-full md:w-80">
                   <Select
                     isMulti={!isSingleDevice}
@@ -354,14 +383,52 @@ const MultiDeviceDashboardPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="w-full md:w-40 mr-2">
-                <Select
-                  options={timeFilterOptions}
-                  value={timeFilterOptions.find((o) => o.value === selectedFilter)}
-                  onChange={(opt) => setSelectedFilter(opt?.value || "15M")}
-                  className="text-sm"
-                  isSearchable={false}
-                />
+              {/* RIGHT: time filter + interval */}
+              <div className="flex items-center gap-2 mr-2">
+
+                {/* Time filter dropdown — shows label + start value */}
+                <div className="w-44">
+                  <Select
+                    options={timeFilterOptions}
+                    value={timeFilterOptions.find((o) => o.value === selectedFilter)}
+                    onChange={handleTimeFilterChange}
+                    className="text-sm"
+                    isSearchable={false}
+                    formatOptionLabel={(opt) => (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-gray-800 dark:text-gray-100">
+                          {opt.label}
+                        </span>
+                        <span className="text-xs text-gray-400 font-mono">
+                          {opt.start}
+                        </span>
+                      </div>
+                    )}
+                  />
+                </div>
+
+                {/* Interval dropdown */}
+                <div className="w-28">
+                  <Select
+                    options={intervalOptions}
+                    value={intervalOptions.find((o) => o.value === selectedInterval)}
+                    onChange={(opt) => setSelectedInterval(opt?.value || "5m")}
+                    className="text-sm"
+                    isSearchable={false}
+                    placeholder="Interval"
+                    formatOptionLabel={(opt) => (
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          every
+                        </span>
+                        <span className="font-medium text-gray-800 dark:text-gray-100">
+                          {opt.label}
+                        </span>
+                      </div>
+                    )}
+                  />
+                </div>
+
               </div>
             </div>
 

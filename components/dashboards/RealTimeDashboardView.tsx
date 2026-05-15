@@ -10,6 +10,7 @@ interface RealTimeDashboardViewProps {
   devices: string[];
   headerNode?: React.ReactNode;
   timeFilter?: string;
+  interval?: string;
 }
 
 /* ─── HALF-GAUGE via Plotly pie ─── */
@@ -70,6 +71,8 @@ export default function RealTimeDashboardView({
   groupId,
   devices: selectedDevices,
   headerNode,
+  timeFilter,
+  interval = "5m",
 }: RealTimeDashboardViewProps) {
   const devices = useRealtimeDevices(groupId, selectedDevices || []);
 
@@ -114,7 +117,7 @@ export default function RealTimeDashboardView({
         sPM2: Number(d.sPM2) || 0,
         device: d.id,
       })),
-  [filteredDevices]);
+    [filteredDevices]);
 
   return (
     <div className="flex flex-col gap-6 w-full h-full">

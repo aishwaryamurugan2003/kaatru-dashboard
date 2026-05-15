@@ -96,6 +96,7 @@ interface DynamicChartBuilderProps {
     defaultChartType?: "line" | "bar" | "pie" | "scatter" | "composed" | "radar";
     measurement?: string;
     timeFilter?: string;
+    interval?: string; // <-- add this
     isCustomFolder?: boolean;
     folderId?: number;
 }
@@ -107,6 +108,7 @@ export default function DynamicChartBuilder({
     defaultChartType = "line",
     measurement = "gurprod",
     timeFilter,
+    interval = "5m",
     isCustomFolder = false,
     folderId,
 }: DynamicChartBuilderProps) {
@@ -243,6 +245,7 @@ export default function DynamicChartBuilder({
                     fields: fields.join(","),
                     measurement,
                     timeFilter,
+                    interval,
                 });
                 setRawApiResponse(response);
             } catch (e: any) {
@@ -431,8 +434,10 @@ export default function DynamicChartBuilder({
                 )}
             </div>
 
-            {/* ANALYTICS PANELS */}
-            <AnalyticsPanels rawApiResponse={rawApiResponse} devices={devices} />
+            {/* ANALYTICS PANELS — hidden for custom folders */}
+            {!isCustomFolder && (
+                <AnalyticsPanels rawApiResponse={rawApiResponse} devices={devices} />
+            )}
         </div>
     );
 }
