@@ -126,7 +126,7 @@ export function RenderChart({
     return (
       <div className="flex flex-col items-center justify-center h-[300px] text-red-500 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-red-100 dark:border-red-900/30 p-4">
         <p className="mb-2 font-medium">Error: {error}</p>
-        <button 
+        <button
           onClick={() => window.location.reload()}
           className="px-4 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors"
         >
@@ -280,14 +280,16 @@ export function RenderChart({
   }
 
   const layout: Partial<Plotly.Layout> = {
-    margin: { t: 20, r: 20, b: 40, l: 50 },
+    margin: { t: 20, r: 20, b: 80, l: 50 },  // increase bottom margin
     paper_bgcolor: "transparent",
     plot_bgcolor: "transparent",
     showlegend: true,
     legend: {
       orientation: "h",
-      y: -0.18,
-      font: { size: 12 },
+      y: -0.35,           // push legend further down
+      x: 0.5,
+      xanchor: "center",  // center it
+      font: { size: 11 }, // slightly smaller font
     },
     dragmode: "zoom",
     ...extraLayout,
@@ -310,10 +312,10 @@ export function RenderChart({
         onLegendClick={handleLegendClick as any}
         useResizeHandler
         style={{ width: "100%", height: "100%" }}
-        config={{ 
-          ...commonPlotlyConfig, 
+        config={{
+          ...commonPlotlyConfig,
           modeBarButtonsToAdd: [customColorButton],
-          responsive: true 
+          responsive: true
         }}
       />
     </div>

@@ -8,6 +8,7 @@ interface SingleDeviceDashboardViewProps {
   devices: string[];
   headerNode?: React.ReactNode;
   timeFilter?: string;
+  interval?: string;
 }
 
 /* ─── HALF-GAUGE via Plotly ─── */
@@ -147,6 +148,7 @@ export default function SingleDeviceDashboardView({
   devices,
   headerNode,
   timeFilter,
+  interval = "5m",
 }: SingleDeviceDashboardViewProps) {
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
