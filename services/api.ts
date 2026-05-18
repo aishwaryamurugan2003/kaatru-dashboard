@@ -536,11 +536,8 @@ export const Endpoint = {
      VITE_APP_SENSOR_API_URL=http://127.0.0.1:8001/v1   (local)
      VITE_APP_SENSOR_API_URL=https://your-prod-api/v1   (prod)
 ------------------------------------------------------------ */
-// const SENSOR_API_BASE =
-//   import.meta.env.VITE_APP_SENSOR_API_URL || "http://127.0.0.1:8001/v1";
-
 const SENSOR_API_BASE =
-  import.meta.env.VITE_APP_SENSOR_API_URL;
+  import.meta.env.VITE_APP_SENSOR_API_URL || "http://127.0.0.1:8001/v1";
 
 /* ------------------------------------------------------------
    JWT UTILITY
